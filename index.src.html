@@ -413,7 +413,21 @@ function groupTeams(rows) {
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(t);
   }
-  return [...groups.values()];
+  const out = [...groups.values()];
+  /* Lone-pair fallback: Nexus sometimes carries slightly different
+     names on a team's 8- and 9-side rows. If exactly one 8-side and
+     one 9-side single of the same kind remain in the same session
+     bucket, they are this member's one team — merge them. */
+  for (const kind of ['dj', 'dbl']) {
+    for (const bucket of [true, false]) {
+      const singles = out.filter(g => g.length === 1 && pairKind(g[0]) === kind && !!g[0].is_prior === bucket);
+      if (singles.length === 2 && singles[0][0].format !== singles[1][0].format) {
+        singles[0].push(singles[1][0]);
+        out.splice(out.indexOf(singles[1]), 1);
+      }
+    }
+  }
+  return out;
 }
 
 /* Pair-status precedence (interview-locked 2026-07-12): any definitive
