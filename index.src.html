@@ -123,6 +123,12 @@
   .answer-row button.no.active  { border-color: var(--spm-primary); background: #fce8ea; color: #a02030; }
   .note-details { margin-top: 10px; }
   .note-details summary { cursor: pointer; font-size: 0.82rem; color: var(--spm-accent); font-weight: 700; }
+  .roster-row { display: flex; gap: 6px; margin-top: 6px; }
+  .roster-row input { margin-top: 0; border-radius: 10px; }
+  .roster-row .r-apa { flex: 0 0 110px; }
+  .roster-row .r-name { flex: 1; min-width: 0; }
+  .roster-row .r-del { flex: 0 0 36px; border: 1px solid var(--border); background: #fff;
+    border-radius: 10px; color: var(--muted); font-size: 1.05rem; }
   .note-on-file { margin-top: 6px; font-size: 0.8rem; background: var(--bg); border-radius: 8px;
     padding: 8px 10px; border: 1px dashed var(--border); }
   .status { margin-top: 8px; font-size: 0.85rem; text-align: center; }
@@ -191,6 +197,13 @@
     <div id="teamsList"></div>
   </div>
 
+  <div class="card" id="myIntentsCard" style="display:none">
+    <h2>Your new-team requests</h2>
+    <p class="hint">Michelle &amp; Paul have these — update the roster below any time,
+       especially once a player without an APA number gets one.</p>
+    <div id="myIntentsList"></div>
+  </div>
+
   <div class="card" id="newTeamCard" style="display:none">
     <h2>Starting a NEW team?</h2>
     <p class="hint">The basics only — no roster needed yet. We prefilled your contact info from
@@ -216,6 +229,11 @@
       <option>Wednesday</option><option>Thursday</option><option>Friday</option>
       <option>Saturday</option><option>Flexible / not sure</option>
     </select>
+    <div id="ntRosterBlock" style="display:none">
+      <p class="hint" style="margin-top:10px"><strong>Who's on the team?</strong> Masters and
+         Doubles register with the full roster. Names now — APA numbers when you have them.</p>
+      <div id="ntRosterRows"></div>
+    </div>
     <input id="ntHost" placeholder="Where do you want to play? (host location)" autocomplete="off">
     <input id="ntPlayers" placeholder="Need players? e.g. 2 players — an SL3 and an SL5" autocomplete="off">
     <textarea id="ntNote" placeholder="Anything else? (who's in, questions, special requests)"></textarea>
@@ -319,7 +337,10 @@ function renderWho() {
          person on this device */
       _prefilledFor = null;
       ['ntName', 'ntPhone', 'ntEmail'].forEach(id => { document.getElementById(id).value = ''; });
+      _gRoster = {}; _intentRosters = {};
+      _ntRoster = [{ apa: '', name: '' }, { apa: '', name: '' }];
       document.getElementById('teamsCard').style.display = 'none';
+      document.getElementById('myIntentsCard').style.display = 'none';
       ntCard.style.display = 'none';
       idCard.style.display = '';
       who.style.display = 'none';
@@ -365,6 +386,7 @@ async function lookup() {
     stat.textContent = ''; stat.className = 'status';
     renderWho();
     await loadTeams();
+    await loadMyIntents();
   } catch (e) { stat.textContent = e.message; stat.className = 'status err'; }
 }
 
@@ -409,6 +431,76 @@ function groupLabel(g) {
   return pairKind(g[0]) === 'dbl' ? '8-Ball + 9-Ball Doubles' : '8-Ball + 9-Ball';
 }
 
+/* ── Roster capture (scope #11) — Masters + Doubles register with the
+      full roster; names required, APA numbers optional (blank = "sign
+      up at join.poolplayers.com, update here when you have it") ──── */
+const ROSTER_FORMATS = ['Masters', '8-Ball Doubles', '9-Ball Doubles'];
+function groupNeedsRoster(g) { return g.some(t => ROSTER_FORMATS.indexOf(t.format) >= 0); }
+const ROSTER_HINT = '<div class="hint" style="margin-top:6px">No APA number yet? Have them sign up at '
+  + '<a href="https://join.poolplayers.com" target="_blank" rel="noopener">join.poolplayers.com</a>'
+  + ' — leave it blank for now and come back to add it.</div>';
+
+/* One editor serves the team cards, the new-team form, and the
+   my-requests card. rows is mutated in place; onSave null = no button
+   (the enclosing form submits it). */
+function wireRosterEditor(box, rows, onSave) {
+  const draw = () => {
+    box.innerHTML = rows.map((r, i) =>
+      '<div class="roster-row">'
+      + '<input class="r-apa" data-ri="' + i + '" placeholder="APA #" value="' + esc(r.apa || '') + '" autocomplete="off" inputmode="numeric">'
+      + '<input class="r-name" data-ri="' + i + '" placeholder="Full name" value="' + esc(r.name || '') + '" autocomplete="off">'
+      + '<button type="button" class="r-del" data-ri="' + i + '" title="Remove">&times;</button>'
+      + '</div>').join('')
+      + ROSTER_HINT
+      + '<div style="display:flex;gap:8px">'
+      + '<button type="button" class="btn-quiet" data-radd>+ Add player</button>'
+      + (onSave ? '<button type="button" class="btn-quiet" data-rsave>Save roster</button>' : '')
+      + '</div>';
+    box.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
+      const i = Number(inp.dataset.ri);
+      if (inp.classList.contains('r-apa')) rows[i].apa = inp.value; else rows[i].name = inp.value;
+    }));
+    box.querySelectorAll('.r-del').forEach(b => b.onclick = () => { rows.splice(Number(b.dataset.ri), 1); if (!rows.length) rows.push({ apa: '', name: '' }); draw(); });
+    box.querySelector('[data-radd]').onclick = () => { rows.push({ apa: '', name: '' }); draw(); };
+    if (onSave) box.querySelector('[data-rsave]').onclick = onSave;
+  };
+  draw();
+}
+function rosterPayload(rows) {
+  return rows.filter(r => (r.name || '').trim())
+    .map(r => ({ apa: (r.apa || '').trim(), name: r.name.trim() }));
+}
+
+let _gRoster = {};   /* team-card editor state per group index */
+async function loadGroupRoster(gi) {
+  const box = document.querySelector('[data-rosterbox="' + gi + '"]');
+  if (!box || box.dataset.wired) return;
+  box.dataset.wired = '1';
+  const g = groupTeams(_teams)[gi];
+  if (!_gRoster[gi]) {
+    try {
+      const rows = await rpc('rerack_get_roster', { p_apa: me.apa, p_team_id: g[0].team_id });
+      _gRoster[gi] = (rows || []).map(r => ({ apa: r.apa || '', name: r.full_name || '' }));
+    } catch (e) { _gRoster[gi] = []; }
+    if (!_gRoster[gi].length) _gRoster[gi] = [{ apa: '', name: '' }, { apa: '', name: '' }];
+  }
+  wireRosterEditor(box, _gRoster[gi], () => saveGroupRoster(gi));
+}
+async function saveGroupRoster(gi) {
+  const g = groupTeams(_teams)[gi];
+  const stat = document.querySelector('[data-gstat="' + gi + '"]');
+  const payload = rosterPayload(_gRoster[gi]);
+  if (!payload.length) { stat.textContent = 'List at least one player by name.'; stat.className = 'status err'; return; }
+  stat.textContent = 'Saving roster…'; stat.className = 'status';
+  try {
+    for (const t of g) {
+      await rpc('rerack_set_roster', { p_apa: me.apa, p_team_id: t.team_id, p_intent_id: null, p_roster: payload });
+    }
+    gasNotify({ action: 'rerack_answer_notify', team_id: g[0].team_id });
+    stat.textContent = '✓ Roster saved — your team gets an email copy.'; stat.className = 'status ok';
+  } catch (e) { stat.textContent = e.message; stat.className = 'status err'; }
+}
+
 function renderTeams() {
   const list = document.getElementById('teamsList');
   const card = document.getElementById('teamsCard');
@@ -446,6 +538,12 @@ function renderTeams() {
       + '<input data-gplayers="' + gi + '" placeholder="Need players? e.g. 2 players — an SL3 and an SL5" value="' + esc(playersRow ? playersRow.players_needed : '') + '">'
       + '<button class="btn-quiet" data-gnotesave="' + gi + '">Save</button>'
       + '</details>'
+      + (groupNeedsRoster(g)
+          ? '<details class="note-details" data-rosterdet="' + gi + '">'
+            + '<summary>Fall roster — who\'s playing?</summary>'
+            + '<div data-rosterbox="' + gi + '"><p class="hint">Loading…</p></div>'
+            + '</details>'
+          : '')
       + '<div class="status" data-gstat="' + gi + '"></div>'
       + '</div>';
   }).join('');
@@ -454,6 +552,9 @@ function renderTeams() {
   });
   list.querySelectorAll('button[data-gnotesave]').forEach(btn => {
     btn.onclick = () => saveNote(Number(btn.dataset.gnotesave));
+  });
+  list.querySelectorAll('details[data-rosterdet]').forEach(d => {
+    d.addEventListener('toggle', () => { if (d.open) loadGroupRoster(Number(d.dataset.rosterdet)); });
   });
 }
 
@@ -518,8 +619,56 @@ async function loadTeams() {
   renderTeams();
 }
 
+/* ── Your new-team requests — visible once identified; lets the
+      organizer update the roster later (the "add the APA number when
+      you have it" path) ───────────────────────────────────────────── */
+let _intentRosters = {};
+async function loadMyIntents() {
+  const card = document.getElementById('myIntentsCard');
+  if (!me) { card.style.display = 'none'; return; }
+  let rows = [];
+  try { rows = await rpc('rerack_my_intents', { p_apa: me.apa }) || []; } catch (e) {}
+  if (!rows.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const list = document.getElementById('myIntentsList');
+  list.innerHTML = rows.map(r =>
+    '<div class="team">'
+    + '<div class="tname">' + esc(r.format) + '</div>'
+    + '<div class="tmeta">' + esc([r.day_of_play, r.host_location].filter(Boolean).join(' · ') || 'details TBD')
+    + ' · sent ' + esc(String(r.created_at || '').slice(0, 10)) + '</div>'
+    + '<span class="chip unanswered">' + (r.status === 'new' ? 'RECEIVED' : esc(String(r.status).toUpperCase())) + '</span>'
+    + '<div style="margin-top:8px;font-size:0.82rem;font-weight:700;color:var(--spm-accent)">Roster</div>'
+    + '<div data-intentroster="' + r.id + '"></div>'
+    + '<div class="status" data-intentstat="' + r.id + '"></div>'
+    + '</div>').join('');
+  for (const r of rows) {
+    _intentRosters[r.id] = (r.roster || []).map(x => ({ apa: x.apa || '', name: x.name || '' }));
+    if (!_intentRosters[r.id].length) _intentRosters[r.id] = [{ apa: '', name: '' }, { apa: '', name: '' }];
+    const box = list.querySelector('[data-intentroster="' + r.id + '"]');
+    wireRosterEditor(box, _intentRosters[r.id], async () => {
+      const stat = list.querySelector('[data-intentstat="' + r.id + '"]');
+      const payload = rosterPayload(_intentRosters[r.id]);
+      if (!payload.length) { stat.textContent = 'List at least one player by name.'; stat.className = 'status err'; return; }
+      stat.textContent = 'Saving…'; stat.className = 'status';
+      try {
+        await rpc('rerack_set_roster', { p_apa: me.apa, p_team_id: null, p_intent_id: r.id, p_roster: payload });
+        stat.textContent = '✓ Roster updated.'; stat.className = 'status ok';
+      } catch (e) { stat.textContent = e.message; stat.className = 'status err'; }
+    });
+  }
+}
+
 /* ── New team intent — the card only exists once identified; the RPC
       still re-validates the APA number server-side ─────────────────── */
+let _ntRoster = [{ apa: '', name: '' }, { apa: '', name: '' }];
+function ntFormatNeedsRoster() {
+  return ROSTER_FORMATS.indexOf(document.getElementById('ntFormat').value) >= 0;
+}
+function ntToggleRoster() {
+  const block = document.getElementById('ntRosterBlock');
+  block.style.display = ntFormatNeedsRoster() ? '' : 'none';
+  if (ntFormatNeedsRoster()) wireRosterEditor(document.getElementById('ntRosterRows'), _ntRoster, null);
+}
 async function newTeam() {
   const stat = document.getElementById('ntStatus');
   if (!me) { stat.textContent = 'Enter your APA number above first.'; stat.className = 'status err'; return; }
@@ -533,17 +682,26 @@ async function newTeam() {
   const note = document.getElementById('ntNote').value.trim();
   if (!fmt) { stat.textContent = 'Pick a format — "Not sure yet" is fine.'; stat.className = 'status err'; return; }
   if (!phone && !email) { stat.textContent = 'Give us a phone or email so we can reach you.'; stat.className = 'status err'; return; }
+  const roster = ntFormatNeedsRoster() ? rosterPayload(_ntRoster) : [];
+  if (ntFormatNeedsRoster() && !roster.length) {
+    stat.textContent = 'List who\'s on the team — names now, APA numbers when you have them.';
+    stat.className = 'status err'; return;
+  }
   stat.textContent = 'Sending…'; stat.className = 'status';
   try {
     const intentId = await rpc('rerack_new_team', {
       p_apa: me.apa, p_name: name,
       p_phone: phone, p_email: email, p_format: fmt,
-      p_day: day, p_host: host, p_players: players, p_note: note
+      p_day: day, p_host: host, p_players: players, p_note: note,
+      p_roster: roster
     });
     gasNotify({ action: 'rerack_new_team_notify', intent_id: intentId });
     stat.textContent = '✓ Got it — Michelle & Paul will reach out. Welcome (back)!';
     stat.className = 'status ok';
     document.getElementById('ntNote').value = '';
+    _ntRoster = [{ apa: '', name: '' }, { apa: '', name: '' }];
+    ntToggleRoster();
+    await loadMyIntents();
   } catch (e) {
     /* the RPC's join-first message should keep its link */
     if (/join\.poolplayers\.com/.test(e.message)) {
@@ -589,8 +747,9 @@ setTimeout(checkVersion, 8000);
 document.getElementById('identBtn').onclick = lookup;
 document.getElementById('identInput').addEventListener('keydown', ev => { if (ev.key === 'Enter') lookup(); });
 document.getElementById('ntBtn').onclick = newTeam;
+document.getElementById('ntFormat').addEventListener('change', ntToggleRoster);
 renderWho();
-if (me) loadTeams();
+if (me) { loadTeams(); loadMyIntents(); }
 </script>
 </body>
 </html>
