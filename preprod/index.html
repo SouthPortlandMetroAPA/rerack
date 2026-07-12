@@ -3,92 +3,176 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ReRack — SPM APA</title>
+<title>ReRack — South Portland Metro APA</title>
 <!-- ════════════════════════════════════════════════════════════════════
-     ReRack v0.1 — "are you coming back next session?"
-     Brief: tools/claude/briefs/2026-07-11-next-session-reg.md (slice 5).
+     ReRack v0.3 — "are you coming back next session?"
+     Brief: tools/claude/briefs/2026-07-11-next-session-reg.md
+     (slice 5 + scope event #6).
 
-     WHO USES THIS (SPM only):
-       - Masters + Doubles teams playing the CURRENT session (their
-         formats have no scorekeeper-app question; the operator
-         transcribes ReRack answers into Nexus, the system of record)
-       - ANY team from the PRIOR session that skipped this one and wants
-         back in for the target session (minus teams the admin linked to
-         a current team in Slate's Next Session tab)
-       - Brand-new teams (intent capture only — no roster building)
+     WHO USES THIS (SPM only — everything current-session plus returners):
+       - ANY team playing the CURRENT session answers the next-session
+         question here (DJ/Ladies may also answer inside the scorekeeper
+         app; Nexus stays the record — the operator transcribes ReRack
+         answers there and Slate's paste guard protects them meanwhile)
+       - ANY team from the PRIOR session that skipped this one (minus
+         teams the admin linked to a current team in Slate)
+       - Brand-new teams (intent capture only — captain must already be
+         an APA member; no roster building)
+     Teams can also file free-text CHANGES (captain, host location,
+     night of play) per team — stored on next_reg.team_note, logged,
+     and emailed to the roster like answers.
 
      TRUST MODEL (Nexus mirror, per interview): identity = APA# or
      email, no auth; ANY roster member can answer or change the answer;
      every change is logged with who/when and shown in the UI; vandalism
      is admin-handled. All writes go through SECURITY DEFINER RPCs
-     (slate.rerack_my_teams / rerack_answer / rerack_new_team) so anon
-     never touches tables directly.
+     (slate.rerack_my_teams / rerack_answer / rerack_team_note /
+     rerack_new_team) so anon never touches tables directly.
+
+     BRANDING: house player-facing look — PatchCheck is the canonical
+     reference (SPM red #ea002a / blue #0031a1 gradient, pill controls,
+     the canonical #updateOverlay). Do not restyle per-app.
 
      DEPLOY: GitHub Pages (SouthPortlandMetroAPA/rerack), preprod under
      /preprod/ polling the ReRack-preprod apa_core row. index.src.html
      is the source; tools/claude/rerack-build.mjs injects the public
-     anon key and writes index.html. Edit the SRC, not the output.
+     anon key and writes preprod/index.html (--promote for root). Edit
+     the SRC, not the output.
      ════════════════════════════════════════════════════════════════════ -->
 <script src="version.js"></script>
 <style>
-  :root { --accent: #0b3d2e; --gold: #b08d2f; --bg: #f6f7f4; --card: #ffffff;
-          --text: #22262e; --muted: #6b7280; --border: #e2e5e0;
-          --ok: #16a34a; --bad: #b91c1c; }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-         background: var(--bg); color: var(--text); font-size: 16px; }
-  header { background: var(--accent); color: #fff; padding: 14px 16px; }
-  header h1 { margin: 0; font-size: 1.25rem; letter-spacing: 0.02em; }
-  header .tag { font-size: 0.78rem; opacity: 0.85; }
-  header .who { margin-top: 6px; font-size: 0.82rem; }
-  header .who a { color: #cfe3da; }
-  main { max-width: 640px; margin: 0 auto; padding: 14px 12px 60px; }
+  :root {
+    --spm-primary: #ea002a;
+    --spm-accent: #0031a1;
+    --bg: #f5f5f5;
+    --card: #ffffff;
+    --border: #e1e1e1;
+    --text: #1f1f1f;
+    --muted: #888;
+    --ok: #16a34a;
+    --bad: #b91c1c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px; }
+  .page { width: 100%; max-width: 600px; margin: 0 auto; padding: 12px; }
+
+  /* ── Header (house gradient card) ── */
+  header {
+    width: 100%; border-radius: 12px; padding: 18px 16px 16px; color: #fff;
+    background: linear-gradient(135deg, var(--spm-primary), var(--spm-accent));
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22); text-align: center; margin-bottom: 14px;
+  }
+  .title { font-size: 1.5rem; font-weight: 900; line-height: 1.08; }
+  .subtitle { font-size: 1.05rem; font-weight: 400; font-style: italic; opacity: 0.95; margin-top: 6px; }
+  .env-pill { display: inline-block; margin-top: 6px; padding: 3px 14px; border-radius: 999px;
+    font-size: 0.65rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+    background: rgba(255,255,255,0.2); color: #fff; border: 1.5px solid rgba(255,255,255,0.5); }
+  .header-status { margin: 8px 0 0; font-size: 0.85rem; opacity: 0.9; }
+  .header-status a { color: #fff; }
+
+  /* ── Cards ── */
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-          padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
-  .card h2 { margin: 0 0 6px; font-size: 1.02rem; color: var(--accent); }
-  .hint { color: var(--muted); font-size: 0.82rem; }
-  input, select, textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--border);
-          border-radius: 8px; font: inherit; margin-top: 6px; background: #fff; }
-  button { font: inherit; cursor: pointer; border-radius: 8px; }
-  .btn-primary { background: var(--accent); color: #fff; border: 0; padding: 12px 16px;
-                 font-weight: 700; width: 100%; margin-top: 10px; }
-  .btn-quiet { background: none; border: 1px solid var(--border); padding: 8px 12px;
-               color: var(--muted); font-size: 0.85rem; }
-  .team { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-top: 10px; }
+    padding: 16px; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1); margin-bottom: 14px; }
+  .card h2 { margin: 0 0 6px; font-size: 1.05rem; color: var(--spm-accent); }
+  .hint { color: var(--muted); font-size: 0.82rem; line-height: 1.45; }
+
+  /* ── Glanceable "is this you" rows ── */
+  .who-row { display: flex; gap: 10px; align-items: baseline; padding: 8px 10px;
+    border-left: 4px solid var(--spm-accent); background: var(--bg);
+    border-radius: 0 8px 8px 0; margin-top: 8px; font-size: 0.86rem; line-height: 1.4; }
+  .who-row b { color: var(--spm-accent); white-space: nowrap; }
+  .who-row.new-row { border-left-color: var(--spm-primary); }
+  .who-row.new-row b { color: var(--spm-primary); }
+  .join-line { margin-top: 10px; padding: 10px; border-radius: 8px; font-size: 0.84rem;
+    line-height: 1.45; background: #e8f0fe; border: 1px solid #afc6f0; color: #1a3b6b; }
+  .join-line a { color: var(--spm-accent); font-weight: 700; }
+
+  /* ── Inputs / buttons (house pills) ── */
+  input, select, textarea { width: 100%; padding: 11px 14px; border: 1px solid var(--border);
+    border-radius: 999px; font: inherit; margin-top: 8px; background: var(--bg);
+    color: var(--text); outline: none; }
+  textarea { border-radius: 12px; min-height: 64px; resize: vertical; }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--spm-accent); box-shadow: 0 0 0 3px rgba(0, 49, 161, 0.15); }
+  button { font: inherit; cursor: pointer; }
+  .btn-primary { display: block; width: 100%; margin-top: 10px; padding: 12px 14px;
+    border: none; border-radius: 999px; color: #fff; font-weight: 900; font-size: 1rem;
+    letter-spacing: 0.05em; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    background: linear-gradient(135deg, var(--spm-primary), var(--spm-accent)); }
+  .btn-primary:disabled { opacity: 0.5; cursor: default; }
+  .btn-quiet { background: none; border: 1px solid var(--border); border-radius: 999px;
+    padding: 8px 14px; color: var(--muted); font-size: 0.85rem; margin-top: 8px; }
+
+  /* ── Team cards ── */
+  .team { border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-top: 10px;
+    background: var(--card); }
   .team .tname { font-weight: 800; font-size: 1.02rem; }
   .team .tmeta { color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
-  .chip { display: inline-block; padding: 2px 10px; border-radius: 999px;
-          font-size: 0.72rem; font-weight: 800; margin-top: 8px; }
-  .chip.playing { background: #f0fdf4; color: var(--ok); }
-  .chip.not_playing { background: #fef2f2; color: var(--bad); }
-  .chip.unanswered { background: #fef9c3; color: #a16207; }
+  .chip { display: inline-block; padding: 2px 12px; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 800; margin-top: 8px; letter-spacing: 0.03em; }
+  .chip.playing { background: #e8f0fe; color: var(--spm-accent); border: 1px solid #afc6f0; }
+  .chip.not_playing { background: #fce8ea; color: #a02030; border: 1px solid #e8a0a8; }
+  .chip.unanswered { background: #fef9c3; color: #a16207; border: 1px solid #f3e08b; }
   .wholine { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
   .answer-row { display: flex; gap: 8px; margin-top: 10px; }
-  .answer-row button { flex: 1; padding: 12px 6px; font-weight: 700; border: 2px solid var(--border);
-                       background: #fff; font-size: 0.9rem; }
-  .answer-row button.yes.active { border-color: var(--ok); background: #f0fdf4; color: var(--ok); }
-  .answer-row button.no.active  { border-color: var(--bad); background: #fef2f2; color: var(--bad); }
-  .status { margin-top: 8px; font-size: 0.85rem; }
+  .answer-row button { flex: 1; padding: 12px 6px; font-weight: 800; border: 2px solid var(--border);
+    background: #fff; font-size: 0.9rem; border-radius: 999px; }
+  .answer-row button.yes.active { border-color: var(--spm-accent); background: #e8f0fe; color: var(--spm-accent); }
+  .answer-row button.no.active  { border-color: var(--spm-primary); background: #fce8ea; color: #a02030; }
+  .note-details { margin-top: 10px; }
+  .note-details summary { cursor: pointer; font-size: 0.82rem; color: var(--spm-accent); font-weight: 700; }
+  .note-on-file { margin-top: 6px; font-size: 0.8rem; background: var(--bg); border-radius: 8px;
+    padding: 8px 10px; border: 1px dashed var(--border); }
+  .status { margin-top: 8px; font-size: 0.85rem; text-align: center; }
   .status.err { color: var(--bad); }
   .status.ok { color: var(--ok); }
-  footer { text-align: center; color: var(--muted); font-size: 0.72rem; padding: 18px 0 30px; }
-  .update-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.86); color: #fff;
-                    display: none; align-items: center; justify-content: center; z-index: 999;
-                    text-align: center; padding: 24px; }
+
+  .footer-note { text-align: center; color: var(--muted); font-size: 0.75rem; padding: 14px 0 30px; }
+
+  /* ── CANONICAL "Updating…" overlay (per MEMORY.md consistency rule).
+        Identical to PatchCheck / Slate admin. Do not customize. ── */
+  .update-overlay { position: fixed; inset: 0; background: rgba(10, 20, 40, 0.72);
+    display: none; align-items: center; justify-content: center; z-index: 9999; padding: 24px; }
   .update-overlay.shown { display: flex; }
-  .update-overlay .spinner { width: 34px; height: 34px; border: 4px solid rgba(255,255,255,0.25);
-                    border-top-color: #fff; border-radius: 50%; margin: 0 auto 14px;
-                    animation: spin 0.9s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .update-box { background: #fff; border-radius: 12px; padding: 36px 32px; max-width: 420px;
+    width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+  .update-spinner { width: 56px; height: 56px; margin: 0 auto 18px; border-radius: 50%;
+    border: 5px solid rgba(0,49,161,0.15); border-top-color: var(--spm-accent);
+    animation: update-spin 0.85s linear infinite; }
+  @keyframes update-spin { to { transform: rotate(360deg); } }
+  .update-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 6px;
+    color: var(--spm-accent); letter-spacing: 0.01em; }
+  .update-sub { color: #444; font-size: 0.9rem; line-height: 1.5; }
 </style>
 </head>
 <body>
-<header>
-  <h1>ReRack <span style="color:var(--gold)">●</span></h1>
-  <div class="tag">South Portland Metro APA — rack up for <span id="targetName">the next session</span></div>
-  <div class="who" id="whoLine" style="display:none"></div>
-</header>
-<main>
+<div class="page">
+  <header>
+    <div class="title">ReRack</div>
+    <div class="subtitle">Rack up for <span id="targetName">the next session</span></div>
+    <div class="env-pill" id="envPill" style="display:none">Preprod</div>
+    <div class="header-status" id="whoLine" style="display:none"></div>
+  </header>
+
+  <div class="card" id="whoForCard">
+    <h2>Is this you?</h2>
+    <div class="who-row"><b>Playing now — DJ or Ladies?</b>
+      <span>Answer here, or in your scorekeeper app. Either works.</span></div>
+    <div class="who-row"><b>Playing now — Masters or Doubles?</b>
+      <span>Answer here — this is the place.</span></div>
+    <div class="who-row"><b>Sat this session out?</b>
+      <span>Tell us if your team is back for <span class="targetNameInline">next session</span>.</span></div>
+    <div class="who-row new-row"><b>Starting a NEW team?</b>
+      <span>Captain fills the short form at the bottom — APA membership required.</span></div>
+    <div class="join-line">
+      <strong>New to APA?</strong> Anyone joining your team signs up at
+      <a href="https://join.poolplayers.com" target="_blank" rel="noopener">join.poolplayers.com</a>.
+      Starting a new team and not a member yet? Sign up there first, then come back here.
+    </div>
+  </div>
+
   <div class="card" id="identityCard">
     <h2>Who are you?</h2>
     <p class="hint">Enter your APA member number or the email on file with the league.
@@ -101,14 +185,16 @@
   <div class="card" id="teamsCard" style="display:none">
     <h2>Your teams</h2>
     <p class="hint">Tell us for each team: playing <span class="targetNameInline">next session</span>, or not.
-       You can change an answer any time — every change is recorded.</p>
+       You can change an answer any time — every change is recorded and your team gets an email copy.
+       Anything else changing — captain, host location, night of play? Add it under the team.</p>
     <div id="teamsList"></div>
   </div>
 
   <div class="card" id="newTeamCard">
     <h2>Starting a NEW team?</h2>
-    <p class="hint">Tell us the basics and we'll take it from there — no roster needed yet.</p>
-    <input id="ntName" placeholder="Your name" autocomplete="name">
+    <p class="hint">The basics only — no roster needed yet. The captain must already be an APA member
+       (<a href="https://join.poolplayers.com" target="_blank" rel="noopener">join here</a> first if not).</p>
+    <input id="ntApa" placeholder="Your APA member number (required)" autocomplete="off" inputmode="numeric">
     <input id="ntPhone" placeholder="Phone" autocomplete="tel" inputmode="tel">
     <input id="ntEmail" placeholder="Email" autocomplete="email" inputmode="email">
     <select id="ntFormat">
@@ -120,18 +206,26 @@
       <option>9-Ball Doubles</option>
       <option>Not sure yet</option>
     </select>
-    <textarea id="ntNote" rows="2" placeholder="Anything else? (who's in, where you'd like to play, questions)"></textarea>
+    <select id="ntDay">
+      <option value="">What night do you want to play?</option>
+      <option>Sunday</option><option>Monday</option><option>Tuesday</option>
+      <option>Wednesday</option><option>Thursday</option><option>Friday</option>
+      <option>Saturday</option><option>Flexible / not sure</option>
+    </select>
+    <input id="ntHost" placeholder="Where do you want to play? (host location)" autocomplete="off">
+    <textarea id="ntNote" placeholder="Anything else? (who's in, questions, special requests)"></textarea>
     <button class="btn-primary" id="ntBtn">Count us in</button>
     <div class="status" id="ntStatus"></div>
   </div>
-</main>
-<footer>ReRack <span id="verSpan"></span> · South Portland Metro APA</footer>
+
+  <div class="footer-note">ReRack <span id="verSpan"></span> · South Portland Metro APA</div>
+</div>
 
 <div class="update-overlay" id="updateOverlay">
-  <div>
-    <div class="spinner"></div>
-    <div style="font-weight:800;font-size:1.05rem">Updating…</div>
-    <div style="font-size:0.85rem;opacity:0.8;margin-top:4px">Getting the newest version of ReRack</div>
+  <div class="update-box">
+    <div class="update-spinner"></div>
+    <div class="update-title">Updating&hellip;</div>
+    <div class="update-sub">A new version is being deployed. This tab will reload automatically&hellip;</div>
   </div>
 </div>
 
@@ -143,6 +237,7 @@ const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsIn
 const IS_PREPROD = /\/preprod\//.test(location.pathname);
 const APP_ROW = IS_PREPROD ? 'ReRack-preprod' : 'ReRack';
 document.getElementById('verSpan').textContent = 'v' + (window.APP_VERSION || '?') + (IS_PREPROD ? ' (preprod)' : '');
+if (IS_PREPROD) document.getElementById('envPill').style.display = '';
 
 const esc = s => { const d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; };
 
@@ -217,6 +312,8 @@ function renderWho() {
       idCard.style.display = '';
       who.style.display = 'none';
     };
+    const apaBox = document.getElementById('ntApa');
+    if (apaBox && !apaBox.value) apaBox.value = me.apa;
   } else {
     who.style.display = 'none';
     idCard.style.display = '';
@@ -243,15 +340,23 @@ async function lookup() {
 /* ── Teams + answers ─────────────────────────────────────────────── */
 let _teams = [];
 
-/* Prior-session DJ teams come as an 8-Ball row + a 9-Ball row with the
-   same name — one card answers both (per interview: one tap covers the
-   pair; each row is still recorded separately, like Nexus does). */
+/* 8+9 twins answer as ONE card — both DJ (8-Ball Open + 9-Ball Open)
+   and Doubles (8-Ball Doubles + 9-Ball Doubles, e.g. the 883/993
+   divisions). Same name, same people, one tap covers the pair; each
+   row is still recorded separately, like Nexus does. Distinct key
+   prefixes keep a DJ team and a Doubles team with the same name apart. */
+function pairKind(t) {
+  if (t.format === '8-Ball Open' || t.format === '9-Ball Open') return 'dj';
+  if (t.format === '8-Ball Doubles' || t.format === '9-Ball Doubles') return 'dbl';
+  return null;
+}
 function groupTeams(rows) {
-  const key = t => (t.is_prior ? 'p' : 'c') + '|' + (t.team_name || '').toLowerCase().replace(/\s+/g, ' ').trim();
-  const isDj = t => t.format === '8-Ball Open' || t.format === '9-Ball Open';
   const groups = new Map();
   for (const t of rows) {
-    const k = isDj(t) ? key(t) : 'solo|' + t.team_id;
+    const kind = pairKind(t);
+    const k = kind
+      ? kind + '|' + (t.is_prior ? 'p' : 'c') + '|' + (t.team_name || '').toLowerCase().replace(/\s+/g, ' ').trim()
+      : 'solo|' + t.team_id;
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(t);
   }
@@ -263,24 +368,28 @@ function groupStatus(g) {
   if (st.size === 1) return g[0].status;
   return 'unanswered'; /* mixed pair — force a fresh answer */
 }
+function groupLabel(g) {
+  if (g.length < 2) return g[0].format;
+  return pairKind(g[0]) === 'dbl' ? '8-Ball + 9-Ball Doubles' : '8-Ball + 9-Ball';
+}
 
 function renderTeams() {
   const list = document.getElementById('teamsList');
   const card = document.getElementById('teamsCard');
+  card.style.display = '';
   if (!_teams.length) {
-    card.style.display = '';
-    list.innerHTML = '<p class="hint">No teams need an answer from you here. Teams playing regular DJ or Ladies divisions answer the question inside the scorekeeper app — and if your team already answered, you\'re all set. Starting fresh? Use the new-team form below.</p>';
+    list.innerHTML = '<p class="hint">No teams need an answer from you here. If your team already answered, you\'re all set. Starting fresh? Use the new-team form below.</p>';
     return;
   }
-  card.style.display = '';
   list.innerHTML = groupTeams(_teams).map((g, gi) => {
     const t = g[0];
     const st = groupStatus(g);
     const both = g.length > 1;
     const answeredBy = g.find(x => x.answered_by_name);
+    const noteRow = g.find(x => x.team_note);
     return '<div class="team">'
       + '<div class="tname">' + esc(t.team_name || ('Team ' + t.team_number)) + '</div>'
-      + '<div class="tmeta">' + esc(both ? '8-Ball + 9-Ball' : t.format) + ' · '
+      + '<div class="tmeta">' + esc(groupLabel(g)) + ' · '
       + esc(t.session_name) + (t.is_prior ? ' — welcome back?' : '') + '</div>'
       + '<span class="chip ' + st + '">' + (st === 'playing' ? 'PLAYING ' + esc(targetName)
           : st === 'not_playing' ? 'NOT PLAYING' : 'NO ANSWER YET') + '</span>'
@@ -292,11 +401,20 @@ function renderTeams() {
       + '<button class="yes' + (st === 'playing' ? ' active' : '') + '" data-g="' + gi + '" data-play="1">We\'re playing' + (both ? ' (both)' : '') + '</button>'
       + '<button class="no' + (st === 'not_playing' ? ' active' : '') + '" data-g="' + gi + '" data-play="0">Not playing</button>'
       + '</div>'
+      + '<details class="note-details"' + (noteRow ? ' open' : '') + '>'
+      + '<summary>Anything changing? Captain, host location, night&hellip;</summary>'
+      + (noteRow ? '<div class="note-on-file">On file: ' + esc(noteRow.team_note) + '</div>' : '')
+      + '<textarea data-gnote="' + gi + '" placeholder="Tell us what\'s changing — new captain, new host location, different night, anything.">' + esc(noteRow ? noteRow.team_note : '') + '</textarea>'
+      + '<button class="btn-quiet" data-gnotesave="' + gi + '">Save changes note</button>'
+      + '</details>'
       + '<div class="status" data-gstat="' + gi + '"></div>'
       + '</div>';
   }).join('');
   list.querySelectorAll('.answer-row button').forEach(btn => {
     btn.onclick = () => answer(Number(btn.dataset.g), btn.dataset.play === '1');
+  });
+  list.querySelectorAll('button[data-gnotesave]').forEach(btn => {
+    btn.onclick = () => saveNote(Number(btn.dataset.gnotesave));
   });
 }
 
@@ -314,9 +432,29 @@ async function answer(gi, playing) {
     for (const t of g) {
       await rpc('rerack_answer', { p_apa: me.apa, p_team_id: t.team_id, p_playing: playing });
     }
-    /* one email per card even for DJ pairs — same name, same roster */
+    /* one email per card even for 8+9 pairs — same name, same roster */
     gasNotify({ action: 'rerack_answer_notify', team_id: g[0].team_id });
     stat.textContent = '✓ Saved — thanks! Your team gets an email copy.'; stat.className = 'status ok';
+    await loadTeams();
+  } catch (e) {
+    stat.textContent = e.message; stat.className = 'status err';
+  }
+}
+
+async function saveNote(gi) {
+  const groups = groupTeams(_teams);
+  const g = groups[gi];
+  if (!g || !me) return;
+  const box = document.querySelector('[data-gnote="' + gi + '"]');
+  const stat = document.querySelector('[data-gstat="' + gi + '"]');
+  const note = (box.value || '').trim();
+  stat.textContent = 'Saving note…'; stat.className = 'status';
+  try {
+    for (const t of g) {
+      await rpc('rerack_team_note', { p_apa: me.apa, p_team_id: t.team_id, p_note: note });
+    }
+    gasNotify({ action: 'rerack_answer_notify', team_id: g[0].team_id });
+    stat.textContent = '✓ Note saved — your team gets an email copy.'; stat.className = 'status ok';
     await loadTeams();
   } catch (e) {
     stat.textContent = e.message; stat.className = 'status err';
@@ -331,28 +469,41 @@ async function loadTeams() {
   renderTeams();
 }
 
-/* ── New team intent ─────────────────────────────────────────────── */
+/* ── New team intent (captain must be an APA member — the RPC
+      validates the number against the player list) ────────────────── */
 async function newTeam() {
   const stat = document.getElementById('ntStatus');
-  const name = document.getElementById('ntName').value.trim();
+  const apa = document.getElementById('ntApa').value.trim();
   const phone = document.getElementById('ntPhone').value.trim();
   const email = document.getElementById('ntEmail').value.trim();
   const fmt = document.getElementById('ntFormat').value;
+  const day = document.getElementById('ntDay').value;
+  const host = document.getElementById('ntHost').value.trim();
   const note = document.getElementById('ntNote').value.trim();
-  if (!fmt) { stat.textContent = 'Pick a format (or "Not sure yet").'; stat.className = 'status err'; return; }
-  if (!name && !me) { stat.textContent = 'Tell us your name.'; stat.className = 'status err'; return; }
-  if (!phone && !email && !me) { stat.textContent = 'Give us a phone or email so we can reach you.'; stat.className = 'status err'; return; }
+  if (!apa) { stat.innerHTML = 'Your APA member number is required — not a member yet? <a href="https://join.poolplayers.com" target="_blank" rel="noopener">Join here</a> first.'; stat.className = 'status err'; return; }
+  if (!fmt) { stat.textContent = 'Pick a format — "Not sure yet" is fine.'; stat.className = 'status err'; return; }
+  if (!phone && !email) { stat.textContent = 'Give us a phone or email so we can reach you.'; stat.className = 'status err'; return; }
   stat.textContent = 'Sending…'; stat.className = 'status';
   try {
     const intentId = await rpc('rerack_new_team', {
-      p_apa: me ? me.apa : '', p_name: name || (me ? me.name : ''),
-      p_phone: phone, p_email: email, p_format: fmt, p_note: note
+      p_apa: apa, p_name: me ? me.name : '',
+      p_phone: phone, p_email: email, p_format: fmt,
+      p_day: day, p_host: host, p_note: note
     });
     gasNotify({ action: 'rerack_new_team_notify', intent_id: intentId });
     stat.textContent = '✓ Got it — Michelle & Paul will reach out. Welcome (back)!';
     stat.className = 'status ok';
     document.getElementById('ntNote').value = '';
-  } catch (e) { stat.textContent = e.message; stat.className = 'status err'; }
+  } catch (e) {
+    /* the RPC's join-first message should keep its link */
+    if (/join\.poolplayers\.com/.test(e.message)) {
+      stat.innerHTML = esc(e.message).replace('join.poolplayers.com',
+        '<a href="https://join.poolplayers.com" target="_blank" rel="noopener">join.poolplayers.com</a>');
+    } else {
+      stat.textContent = e.message;
+    }
+    stat.className = 'status err';
+  }
 }
 
 /* ── Auto-updater (house pattern: poll own env row; overlay until the
