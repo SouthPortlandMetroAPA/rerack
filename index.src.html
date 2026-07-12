@@ -382,11 +382,16 @@ function groupTeams(rows) {
   return [...groups.values()];
 }
 
+/* Pair-status precedence (interview-locked 2026-07-12): any definitive
+   answer beats unanswered; on a P+N conflict YES wins here and the
+   operator gets a red flag in Slate — players never see the conflict. */
 function groupStatus(g) {
-  const st = new Set(g.map(t => t.status));
-  if (st.size === 1) return g[0].status;
-  return 'unanswered'; /* mixed pair — force a fresh answer */
+  const st = g.map(t => t.status);
+  if (st.indexOf('playing') >= 0) return 'playing';
+  if (st.indexOf('not_playing') >= 0) return 'not_playing';
+  return 'unanswered';
 }
+function groupMixed(g) { return new Set(g.map(t => t.status)).size > 1; }
 function groupLabel(g) {
   if (g.length < 2) return g[0].format;
   return pairKind(g[0]) === 'dbl' ? '8-Ball + 9-Ball Doubles' : '8-Ball + 9-Ball';
@@ -446,8 +451,11 @@ async function answer(gi, playing) {
   if (!g) return;
   const cur = groupStatus(g);
   const next = playing ? 'playing' : 'not_playing';
-  if (cur === next) return;
-  if (cur !== 'unanswered' && !confirm('Change the answer to "' + (playing ? 'playing' : 'not playing') + '"? The change is recorded with your name.')) return;
+  /* a MIXED pair must stay writable even when the tap matches the
+     displayed status — that's how the divergent row gets fixed */
+  if (cur === next && !groupMixed(g)) return;
+  if (cur !== 'unanswered' && cur !== next
+      && !confirm('Change the answer to "' + (playing ? 'playing' : 'not playing') + '"? The change is recorded with your name.')) return;
   const stat = document.querySelector('[data-gstat="' + gi + '"]');
   stat.textContent = 'Saving…'; stat.className = 'status';
   try {
