@@ -526,7 +526,6 @@ function renderTeams() {
   list.innerHTML = groupTeams(_teams).map((g, gi) => {
     const t = g[0];
     const st = groupStatus(g);
-    const both = g.length > 1;
     const answeredBy = g.find(x => x.answered_by_name);
     const noteRow = g.find(x => x.team_note);
     const playersRow = g.find(x => x.players_needed);
@@ -541,7 +540,7 @@ function renderTeams() {
             + (answeredBy.answered_at ? ' · ' + esc(String(answeredBy.answered_at).slice(0, 10)) : '') + '</div>'
           : '')
       + '<div class="answer-row">'
-      + '<button class="yes' + (st === 'playing' ? ' active' : '') + '" data-g="' + gi + '" data-play="1">We\'re playing' + (both ? ' (both)' : '') + '</button>'
+      + '<button class="yes' + (st === 'playing' ? ' active' : '') + '" data-g="' + gi + '" data-play="1">We\'re playing</button>'
       + '<button class="no' + (st === 'not_playing' ? ' active' : '') + '" data-g="' + gi + '" data-play="0">Not playing</button>'
       + '</div>'
       + '<details class="note-details"' + (noteRow || playersRow ? ' open' : '') + '>'
