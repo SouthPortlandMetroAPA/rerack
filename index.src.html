@@ -194,9 +194,12 @@
     <h2>Starting a NEW team?</h2>
     <p class="hint">The basics only — no roster needed yet. We prefilled your contact info from
        your APA record; fix anything that's off.</p>
-    <input id="ntName" placeholder="Your name" autocomplete="name">
-    <input id="ntPhone" placeholder="Phone" autocomplete="tel" inputmode="tel">
-    <input id="ntEmail" placeholder="Email" autocomplete="email" inputmode="email">
+    <!-- autocomplete=off: Chrome's saved-address autofill was injecting a
+         DIFFERENT person's details over the APA-record prefill (user-caught
+         2026-07-12); the APA record is the source of truth here -->
+    <input id="ntName" placeholder="Your name" autocomplete="off">
+    <input id="ntPhone" placeholder="Phone" autocomplete="off" inputmode="tel">
+    <input id="ntEmail" placeholder="Email" autocomplete="off" inputmode="email">
     <select id="ntFormat">
       <option value="">What format?</option>
       <option>Double Jeopardy (8-Ball + 9-Ball)</option>
@@ -311,6 +314,10 @@ function renderWho() {
       ev.preventDefault();
       me = null;
       localStorage.removeItem('rerack.identity');
+      /* the old identity's contact details must not linger for the next
+         person on this device */
+      _prefilledFor = null;
+      ['ntName', 'ntPhone', 'ntEmail'].forEach(id => { document.getElementById(id).value = ''; });
       document.getElementById('teamsCard').style.display = 'none';
       ntCard.style.display = 'none';
       idCard.style.display = '';
@@ -324,18 +331,22 @@ function renderWho() {
   }
 }
 
-/* Prefill the new-team form from the member's APA record — editable;
-   never overwrite something the user already typed. */
+/* Prefill the new-team form from the member's APA record — editable.
+   FORCE-overwrites whenever the identity changes (only-fill-empty kept
+   the PREVIOUS person's details after Switch player — user-caught
+   2026-07-12); edits within one identity survive because we only fill
+   once per APA number. */
+let _prefilledFor = null;
 async function prefillContact() {
-  if (!me) return;
+  if (!me || _prefilledFor === me.apa) return;
   try {
     const rows = await rpc('rerack_my_contact', { p_apa: me.apa });
-    const c = rows && rows[0];
-    if (!c) return;
-    const put = (id, v) => { const el = document.getElementById(id); if (el && !el.value && v) el.value = v; };
-    put('ntName', c.name || me.name);
-    put('ntPhone', c.phone);
-    put('ntEmail', c.email);
+    const c = (rows && rows[0]) || {};
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    set('ntName', c.name || me.name);
+    set('ntPhone', c.phone);
+    set('ntEmail', c.email);
+    _prefilledFor = me.apa;
   } catch (e) { /* prefill is best-effort */ }
 }
 
@@ -451,9 +462,14 @@ async function answer(gi, playing) {
   if (!g) return;
   const cur = groupStatus(g);
   const next = playing ? 'playing' : 'not_playing';
+  const stat0 = document.querySelector('[data-gstat="' + gi + '"]');
   /* a MIXED pair must stay writable even when the tap matches the
-     displayed status — that's how the divergent row gets fixed */
-  if (cur === next && !groupMixed(g)) return;
+     displayed status — that's how the divergent row gets fixed. A
+     clean same-value tap answers out loud instead of doing nothing. */
+  if (cur === next && !groupMixed(g)) {
+    stat0.textContent = '✓ Already recorded — you\'re all set.'; stat0.className = 'status ok';
+    return;
+  }
   if (cur !== 'unanswered' && cur !== next
       && !confirm('Change the answer to "' + (playing ? 'playing' : 'not playing') + '"? The change is recorded with your name.')) return;
   const stat = document.querySelector('[data-gstat="' + gi + '"]');
