@@ -1,10 +1,8 @@
 /* ════════════════════════════════════════════════════════════════════════
-   ReRack — single global version constant.
-   Deploy workflow (same as PaperTrail):
-     1. Edit window.APP_VERSION here.
-     2. Push; deploy-finisher bumps apa_core.apps for the right env row:
-        - preprod pages (under /preprod/) poll 'ReRack-preprod'
-        - prod pages poll 'ReRack'
-     3. promote.sh Apps/ReRack/site syncs prod at promote time.
+   ReRack — PROD version constant. FROZEN between promotes: bump ONLY at
+   promote time (rerack-build.mjs --promote copies preprod/version.js
+   here), then sync the 'ReRack' apa_core row. Day-to-day work bumps
+   preprod/version.js instead — prod pages poll the 'ReRack' row and a
+   mismatched bump here strands open tabs on "Updating…".
    ════════════════════════════════════════════════════════════════════════ */
 window.APP_VERSION = '0.1';

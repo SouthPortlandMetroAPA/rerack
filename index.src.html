@@ -171,6 +171,18 @@ async function sbGet(path) {
   return r.json();
 }
 
+/* ── Notify emails (keyless GAS — the server re-derives everything from
+      the DB, so these calls carry only ids; is_preprod routes the mail
+      to the operator inbox instead of the roster) ─────────────────── */
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzGTzkBRTrIIP_tD6sbtOOUmNZkXDdtxPoO4c8fdWt5h3tZFueNSISPv8Q3LWStx73Whw/exec';
+function gasNotify(payload) {
+  /* fire-and-forget; text/plain avoids the CORS preflight GAS can't answer */
+  try {
+    fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(Object.assign({ is_preprod: IS_PREPROD }, payload)) }).catch(() => {});
+  } catch (e) {}
+}
+
 /* ── Target session name (dynamic — first session after the current) */
 let targetName = 'the next session';
 (async () => {
@@ -302,7 +314,9 @@ async function answer(gi, playing) {
     for (const t of g) {
       await rpc('rerack_answer', { p_apa: me.apa, p_team_id: t.team_id, p_playing: playing });
     }
-    stat.textContent = '✓ Saved — thanks!'; stat.className = 'status ok';
+    /* one email per card even for DJ pairs — same name, same roster */
+    gasNotify({ action: 'rerack_answer_notify', team_id: g[0].team_id });
+    stat.textContent = '✓ Saved — thanks! Your team gets an email copy.'; stat.className = 'status ok';
     await loadTeams();
   } catch (e) {
     stat.textContent = e.message; stat.className = 'status err';
@@ -330,10 +344,11 @@ async function newTeam() {
   if (!phone && !email && !me) { stat.textContent = 'Give us a phone or email so we can reach you.'; stat.className = 'status err'; return; }
   stat.textContent = 'Sending…'; stat.className = 'status';
   try {
-    await rpc('rerack_new_team', {
+    const intentId = await rpc('rerack_new_team', {
       p_apa: me ? me.apa : '', p_name: name || (me ? me.name : ''),
       p_phone: phone, p_email: email, p_format: fmt, p_note: note
     });
+    gasNotify({ action: 'rerack_new_team_notify', intent_id: intentId });
     stat.textContent = '✓ Got it — Michelle & Paul will reach out. Welcome (back)!';
     stat.className = 'status ok';
     document.getElementById('ntNote').value = '';
