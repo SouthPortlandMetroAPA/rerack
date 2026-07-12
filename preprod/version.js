@@ -4,4 +4,4 @@
    Pages serves it. Root version.js is prod's and stays frozen until
    rerack-build.mjs --promote copies this file over it.
    ════════════════════════════════════════════════════════════════════════ */
-window.APP_VERSION = '0.3';
+window.APP_VERSION = '0.4';

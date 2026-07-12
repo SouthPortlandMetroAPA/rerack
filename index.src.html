@@ -165,7 +165,7 @@
     <div class="who-row"><b>Sat this session out?</b>
       <span>Tell us if your team is back for <span class="targetNameInline">next session</span>.</span></div>
     <div class="who-row new-row"><b>Starting a NEW team?</b>
-      <span>Captain fills the short form at the bottom — APA membership required.</span></div>
+      <span>Enter your APA number below first — the short form appears after. APA membership required.</span></div>
     <div class="join-line">
       <strong>New to APA?</strong> Anyone joining your team signs up at
       <a href="https://join.poolplayers.com" target="_blank" rel="noopener">join.poolplayers.com</a>.
@@ -178,7 +178,7 @@
     <p class="hint">Enter your APA member number or the email on file with the league.
        Any player on the team can answer for the team.</p>
     <input id="identInput" placeholder="APA # or email" autocomplete="off" inputmode="email">
-    <button class="btn-primary" id="identBtn">Find my teams</button>
+    <button class="btn-primary" id="identBtn">Get started</button>
     <div class="status" id="identStatus"></div>
   </div>
 
@@ -190,11 +190,11 @@
     <div id="teamsList"></div>
   </div>
 
-  <div class="card" id="newTeamCard">
+  <div class="card" id="newTeamCard" style="display:none">
     <h2>Starting a NEW team?</h2>
-    <p class="hint">The basics only — no roster needed yet. The captain must already be an APA member
-       (<a href="https://join.poolplayers.com" target="_blank" rel="noopener">join here</a> first if not).</p>
-    <input id="ntApa" placeholder="Your APA member number (required)" autocomplete="off" inputmode="numeric">
+    <p class="hint">The basics only — no roster needed yet. We prefilled your contact info from
+       your APA record; fix anything that's off.</p>
+    <input id="ntName" placeholder="Your name" autocomplete="name">
     <input id="ntPhone" placeholder="Phone" autocomplete="tel" inputmode="tel">
     <input id="ntEmail" placeholder="Email" autocomplete="email" inputmode="email">
     <select id="ntFormat">
@@ -213,6 +213,7 @@
       <option>Saturday</option><option>Flexible / not sure</option>
     </select>
     <input id="ntHost" placeholder="Where do you want to play? (host location)" autocomplete="off">
+    <input id="ntPlayers" placeholder="Need players? e.g. 2 players — an SL3 and an SL5" autocomplete="off">
     <textarea id="ntNote" placeholder="Anything else? (who's in, questions, special requests)"></textarea>
     <button class="btn-primary" id="ntBtn">Count us in</button>
     <div class="status" id="ntStatus"></div>
@@ -300,24 +301,42 @@ try { me = JSON.parse(localStorage.getItem('rerack.identity') || 'null'); } catc
 function renderWho() {
   const who = document.getElementById('whoLine');
   const idCard = document.getElementById('identityCard');
+  const ntCard = document.getElementById('newTeamCard');
   if (me) {
     who.style.display = '';
     who.innerHTML = esc(me.name) + ' · <a href="#" id="switchLink">Switch player</a>';
     idCard.style.display = 'none';
+    ntCard.style.display = '';           /* revealed only once identified */
     document.getElementById('switchLink').onclick = (ev) => {
       ev.preventDefault();
       me = null;
       localStorage.removeItem('rerack.identity');
       document.getElementById('teamsCard').style.display = 'none';
+      ntCard.style.display = 'none';
       idCard.style.display = '';
       who.style.display = 'none';
     };
-    const apaBox = document.getElementById('ntApa');
-    if (apaBox && !apaBox.value) apaBox.value = me.apa;
+    prefillContact();
   } else {
     who.style.display = 'none';
     idCard.style.display = '';
+    ntCard.style.display = 'none';
   }
+}
+
+/* Prefill the new-team form from the member's APA record — editable;
+   never overwrite something the user already typed. */
+async function prefillContact() {
+  if (!me) return;
+  try {
+    const rows = await rpc('rerack_my_contact', { p_apa: me.apa });
+    const c = rows && rows[0];
+    if (!c) return;
+    const put = (id, v) => { const el = document.getElementById(id); if (el && !el.value && v) el.value = v; };
+    put('ntName', c.name || me.name);
+    put('ntPhone', c.phone);
+    put('ntEmail', c.email);
+  } catch (e) { /* prefill is best-effort */ }
 }
 
 async function lookup() {
@@ -387,6 +406,7 @@ function renderTeams() {
     const both = g.length > 1;
     const answeredBy = g.find(x => x.answered_by_name);
     const noteRow = g.find(x => x.team_note);
+    const playersRow = g.find(x => x.players_needed);
     return '<div class="team">'
       + '<div class="tname">' + esc(t.team_name || ('Team ' + t.team_number)) + '</div>'
       + '<div class="tmeta">' + esc(groupLabel(g)) + ' · '
@@ -401,11 +421,13 @@ function renderTeams() {
       + '<button class="yes' + (st === 'playing' ? ' active' : '') + '" data-g="' + gi + '" data-play="1">We\'re playing' + (both ? ' (both)' : '') + '</button>'
       + '<button class="no' + (st === 'not_playing' ? ' active' : '') + '" data-g="' + gi + '" data-play="0">Not playing</button>'
       + '</div>'
-      + '<details class="note-details"' + (noteRow ? ' open' : '') + '>'
-      + '<summary>Anything changing? Captain, host location, night&hellip;</summary>'
+      + '<details class="note-details"' + (noteRow || playersRow ? ' open' : '') + '>'
+      + '<summary>Anything changing, or need players?</summary>'
       + (noteRow ? '<div class="note-on-file">On file: ' + esc(noteRow.team_note) + '</div>' : '')
+      + (playersRow ? '<div class="note-on-file">Looking for: ' + esc(playersRow.players_needed) + '</div>' : '')
       + '<textarea data-gnote="' + gi + '" placeholder="Tell us what\'s changing — new captain, new host location, different night, anything.">' + esc(noteRow ? noteRow.team_note : '') + '</textarea>'
-      + '<button class="btn-quiet" data-gnotesave="' + gi + '">Save changes note</button>'
+      + '<input data-gplayers="' + gi + '" placeholder="Need players? e.g. 2 players — an SL3 and an SL5" value="' + esc(playersRow ? playersRow.players_needed : '') + '">'
+      + '<button class="btn-quiet" data-gnotesave="' + gi + '">Save</button>'
       + '</details>'
       + '<div class="status" data-gstat="' + gi + '"></div>'
       + '</div>';
@@ -446,12 +468,14 @@ async function saveNote(gi) {
   const g = groups[gi];
   if (!g || !me) return;
   const box = document.querySelector('[data-gnote="' + gi + '"]');
+  const pbox = document.querySelector('[data-gplayers="' + gi + '"]');
   const stat = document.querySelector('[data-gstat="' + gi + '"]');
   const note = (box.value || '').trim();
-  stat.textContent = 'Saving note…'; stat.className = 'status';
+  const players = (pbox && pbox.value || '').trim();
+  stat.textContent = 'Saving…'; stat.className = 'status';
   try {
     for (const t of g) {
-      await rpc('rerack_team_note', { p_apa: me.apa, p_team_id: t.team_id, p_note: note });
+      await rpc('rerack_team_note', { p_apa: me.apa, p_team_id: t.team_id, p_note: note, p_players: players });
     }
     gasNotify({ action: 'rerack_answer_notify', team_id: g[0].team_id });
     stat.textContent = '✓ Note saved — your team gets an email copy.'; stat.className = 'status ok';
@@ -469,26 +493,27 @@ async function loadTeams() {
   renderTeams();
 }
 
-/* ── New team intent (captain must be an APA member — the RPC
-      validates the number against the player list) ────────────────── */
+/* ── New team intent — the card only exists once identified; the RPC
+      still re-validates the APA number server-side ─────────────────── */
 async function newTeam() {
   const stat = document.getElementById('ntStatus');
-  const apa = document.getElementById('ntApa').value.trim();
+  if (!me) { stat.textContent = 'Enter your APA number above first.'; stat.className = 'status err'; return; }
+  const name = document.getElementById('ntName').value.trim();
   const phone = document.getElementById('ntPhone').value.trim();
   const email = document.getElementById('ntEmail').value.trim();
   const fmt = document.getElementById('ntFormat').value;
   const day = document.getElementById('ntDay').value;
   const host = document.getElementById('ntHost').value.trim();
+  const players = document.getElementById('ntPlayers').value.trim();
   const note = document.getElementById('ntNote').value.trim();
-  if (!apa) { stat.innerHTML = 'Your APA member number is required — not a member yet? <a href="https://join.poolplayers.com" target="_blank" rel="noopener">Join here</a> first.'; stat.className = 'status err'; return; }
   if (!fmt) { stat.textContent = 'Pick a format — "Not sure yet" is fine.'; stat.className = 'status err'; return; }
   if (!phone && !email) { stat.textContent = 'Give us a phone or email so we can reach you.'; stat.className = 'status err'; return; }
   stat.textContent = 'Sending…'; stat.className = 'status';
   try {
     const intentId = await rpc('rerack_new_team', {
-      p_apa: apa, p_name: me ? me.name : '',
+      p_apa: me.apa, p_name: name,
       p_phone: phone, p_email: email, p_format: fmt,
-      p_day: day, p_host: host, p_note: note
+      p_day: day, p_host: host, p_players: players, p_note: note
     });
     gasNotify({ action: 'rerack_new_team_notify', intent_id: intentId });
     stat.textContent = '✓ Got it — Michelle & Paul will reach out. Welcome (back)!';
