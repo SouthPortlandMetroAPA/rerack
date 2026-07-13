@@ -115,6 +115,11 @@
   .chip.playing { background: #e8f0fe; color: var(--spm-accent); border: 1px solid #afc6f0; }
   .chip.not_playing { background: #fce8ea; color: #a02030; border: 1px solid #e8a0a8; }
   .chip.unanswered { background: #fef9c3; color: #a16207; border: 1px solid #f3e08b; }
+  .chip.undecided { background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; }
+  .answer-undecided { display: block; width: 100%; margin-top: 8px; padding: 10px 6px;
+    font-weight: 700; border: 2px solid var(--border); background: #fff; font-size: 0.85rem;
+    border-radius: 999px; color: var(--muted); }
+  .answer-undecided.active { border-color: #6d28d9; background: #ede9fe; color: #6d28d9; }
   .wholine { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
   .answer-row { display: flex; gap: 8px; margin-top: 10px; }
   .answer-row button { flex: 1; padding: 12px 6px; font-weight: 800; border: 2px solid var(--border);
@@ -432,11 +437,14 @@ function groupTeams(rows) {
 
 /* Pair-status precedence (interview-locked 2026-07-12): any definitive
    answer beats unanswered; on a P+N conflict YES wins here and the
-   operator gets a red flag in Slate — players never see the conflict. */
+   operator gets a red flag in Slate — players never see the conflict.
+   'undecided' (still figuring it out) sits between: a real response,
+   but any definitive twin answer outranks it. */
 function groupStatus(g) {
   const st = g.map(t => t.status);
   if (st.indexOf('playing') >= 0) return 'playing';
   if (st.indexOf('not_playing') >= 0) return 'not_playing';
+  if (st.indexOf('undecided') >= 0) return 'undecided';
   return 'unanswered';
 }
 function groupMixed(g) { return new Set(g.map(t => t.status)).size > 1; }
@@ -534,15 +542,17 @@ function renderTeams() {
       + '<div class="tmeta">' + esc(groupLabel(g)) + ' · '
       + esc(t.session_name) + (t.is_prior ? ' — welcome back?' : '') + '</div>'
       + '<span class="chip ' + st + '">' + (st === 'playing' ? 'PLAYING ' + esc(targetName)
-          : st === 'not_playing' ? 'NOT PLAYING' : 'NO ANSWER YET') + '</span>'
+          : st === 'not_playing' ? 'NOT PLAYING'
+          : st === 'undecided' ? 'STILL DECIDING' : 'NO ANSWER YET') + '</span>'
       + (answeredBy && st !== 'unanswered'
           ? '<div class="wholine">answered by ' + esc(answeredBy.answered_by_name)
             + (answeredBy.answered_at ? ' · ' + esc(String(answeredBy.answered_at).slice(0, 10)) : '') + '</div>'
           : '')
       + '<div class="answer-row">'
-      + '<button class="yes' + (st === 'playing' ? ' active' : '') + '" data-g="' + gi + '" data-play="1">We\'re playing</button>'
-      + '<button class="no' + (st === 'not_playing' ? ' active' : '') + '" data-g="' + gi + '" data-play="0">Not playing</button>'
+      + '<button class="yes' + (st === 'playing' ? ' active' : '') + '" data-g="' + gi + '" data-ans="playing">We\'re playing</button>'
+      + '<button class="no' + (st === 'not_playing' ? ' active' : '') + '" data-g="' + gi + '" data-ans="not_playing">Not playing</button>'
       + '</div>'
+      + '<button class="answer-undecided' + (st === 'undecided' ? ' active' : '') + '" data-g="' + gi + '" data-ans="undecided">Still figuring it out</button>'
       + '<details class="note-details"' + (noteRow || playersRow ? ' open' : '') + '>'
       + '<summary>Anything changing, or need players?</summary>'
       + (noteRow ? '<div class="note-on-file">On file: ' + esc(noteRow.team_note) + '</div>' : '')
@@ -560,8 +570,8 @@ function renderTeams() {
       + '<div class="status" data-gstat="' + gi + '"></div>'
       + '</div>';
   }).join('');
-  list.querySelectorAll('.answer-row button').forEach(btn => {
-    btn.onclick = () => answer(Number(btn.dataset.g), btn.dataset.play === '1');
+  list.querySelectorAll('.answer-row button, .answer-undecided').forEach(btn => {
+    btn.onclick = () => answer(Number(btn.dataset.g), btn.dataset.ans);
   });
   list.querySelectorAll('button[data-gnotesave]').forEach(btn => {
     btn.onclick = () => saveNote(Number(btn.dataset.gnotesave));
@@ -571,12 +581,12 @@ function renderTeams() {
   });
 }
 
-async function answer(gi, playing) {
+async function answer(gi, next) {
   const groups = groupTeams(_teams);
   const g = groups[gi];
-  if (!g) return;
+  if (!g || !next) return;
   const cur = groupStatus(g);
-  const next = playing ? 'playing' : 'not_playing';
+  const word = next === 'playing' ? 'playing' : next === 'not_playing' ? 'not playing' : 'still figuring it out';
   const stat0 = document.querySelector('[data-gstat="' + gi + '"]');
   /* a MIXED pair must stay writable even when the tap matches the
      displayed status — that's how the divergent row gets fixed. A
@@ -586,12 +596,12 @@ async function answer(gi, playing) {
     return;
   }
   if (cur !== 'unanswered' && cur !== next
-      && !confirm('Change the answer to "' + (playing ? 'playing' : 'not playing') + '"? The change is recorded with your name.')) return;
+      && !confirm('Change the answer to "' + word + '"? The change is recorded with your name.')) return;
   const stat = document.querySelector('[data-gstat="' + gi + '"]');
   stat.textContent = 'Saving…'; stat.className = 'status';
   try {
     for (const t of g) {
-      await rpc('rerack_answer', { p_apa: me.apa, p_team_id: t.team_id, p_playing: playing });
+      await rpc('rerack_answer', { p_apa: me.apa, p_team_id: t.team_id, p_answer: next });
     }
     /* one email per card even for 8+9 pairs — same name, same roster */
     gasNotify({ action: 'rerack_answer_notify', team_id: g[0].team_id });
