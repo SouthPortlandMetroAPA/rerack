@@ -1,8 +1,7 @@
 /* ════════════════════════════════════════════════════════════════════════
-   ReRack — PROD version constant. FROZEN between promotes: bump ONLY at
-   promote time (rerack-build.mjs --promote copies preprod/version.js
-   here), then sync the 'ReRack' apa_core row. Day-to-day work bumps
-   preprod/version.js instead — prod pages poll the 'ReRack' row and a
-   mismatched bump here strands open tabs on "Updating…".
+   ReRack — PREPROD version constant. Edit THIS file for every preprod
+   ship; deploy-finisher bumps the 'ReRack-preprod' apa_core row after
+   Pages serves it. Root version.js is prod's and stays frozen until
+   rerack-build.mjs --promote copies this file over it.
    ════════════════════════════════════════════════════════════════════════ */
-window.APP_VERSION = '0.1';
+window.APP_VERSION = '0.11';
