@@ -100,6 +100,18 @@
     padding: 10px 12px; margin-top: 10px; font-size: 0.82rem; line-height: 1.5; color: #1a3b6b; }
   .scorekeeper-note b { color: var(--spm-accent); }
 
+  /* ── New-team form collapsed behind an optional toggle (v0.16) ── */
+  .nt-card { background: #fafbfc; }
+  .nt-toggle { width: 100%; background: none; border: none; padding: 0; cursor: pointer;
+    text-align: left; display: flex; flex-direction: column; gap: 3px; }
+  .nt-toggle-title { font-size: 1.05rem; font-weight: 800; color: var(--spm-accent); }
+  .nt-toggle-sub { font-size: 0.82rem; color: var(--muted); font-weight: 400; line-height: 1.45; }
+  .nt-chev { display: inline-block; transition: transform 0.15s; font-size: 0.8rem; }
+  .nt-chev.open { transform: rotate(90deg); }
+  .done-note { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: #e4f1e9;
+    border: 1px solid #b7e0c6; color: #1f6b3f; font-size: 0.88rem; line-height: 1.5; }
+  .done-note b { color: #155c33; }
+
   /* ── Inputs / buttons (house pills) ── */
   input, select, textarea { width: 100%; padding: 11px 14px; border: 1px solid var(--border);
     border-radius: 999px; font: inherit; margin-top: 8px; background: var(--bg);
@@ -260,8 +272,12 @@
     <div id="myIntentsList"></div>
   </div>
 
-  <div class="card" id="newTeamCard" style="display:none">
-    <h2>Starting a NEW team?</h2>
+  <div class="card nt-card" id="newTeamCard" style="display:none">
+    <button class="nt-toggle" id="ntToggle" type="button">
+      <span class="nt-toggle-title">Starting a <b>brand-new</b> team? <span class="nt-chev" id="ntChev">&#9656;</span></span>
+      <span class="nt-toggle-sub">Only tap this if your team <b>isn't listed above.</b> If it is, you're already done — there's no form to fill out here.</span>
+    </button>
+    <div id="ntForm" style="display:none">
     <p class="hint">The basics only — no roster needed yet. We prefilled your contact info from
        your APA record; fix anything that's off.</p>
     <!-- autocomplete=off: Chrome's saved-address autofill was injecting a
@@ -295,6 +311,7 @@
     <textarea id="ntNote" placeholder="Anything else? (who's in, questions, special requests)"></textarea>
     <button class="btn-primary" id="ntBtn">Count us in</button>
     <div class="status" id="ntStatus"></div>
+    </div>
   </div>
 
   <div class="footer-note">ReRack <span id="verSpan"></span> · South Portland Metro APA</div>
@@ -652,7 +669,10 @@ function renderTeams() {
       + '</details>'
       + '<div class="status" data-gstat="' + gi + '"></div>'
       + '</div>';
-  }).join('');
+  }).join('')
+    + '<div class="done-note">👆 That\'s all we need — just tap an answer for each team above. '
+    + '<b>There\'s no form to fill out.</b> The "new team" box below is only for starting a '
+    + 'brand-new team that isn\'t in the league yet.</div>';
   list.querySelectorAll('.answer-row button, .answer-undecided').forEach(btn => {
     btn.onclick = () => answer(Number(btn.dataset.g), btn.dataset.ans);
   });
@@ -740,7 +760,19 @@ async function loadTeams() {
     _teams = await rpc('rerack_my_teams', { p_apa: me.apa }) || [];
   } catch (e) { _teams = []; }
   renderTeams();
+  syncNewTeamVisibility();
 }
+
+/* New-team form is collapsed behind a clearly-optional toggle so returning
+   players (who just answer above) aren't lured into filling a reg form.
+   Auto-opens ONLY when the player has NO teams (likely here to start one). */
+function ntToggleForm(open) {
+  const f = document.getElementById('ntForm');
+  const show = open === undefined ? f.style.display === 'none' : open;
+  f.style.display = show ? '' : 'none';
+  document.getElementById('ntChev').classList.toggle('open', show);
+}
+function syncNewTeamVisibility() { ntToggleForm(_teams.length === 0); }
 
 /* ── Your new-team requests — visible once identified; lets the
       organizer update the roster later (the "add the APA number when
@@ -871,6 +903,7 @@ document.getElementById('identBtn').onclick = lookup;
 document.getElementById('identInput').addEventListener('keydown', ev => { if (ev.key === 'Enter') lookup(); });
 document.getElementById('ntBtn').onclick = newTeam;
 document.getElementById('ntFormat').addEventListener('change', ntToggleRoster);
+document.getElementById('ntToggle').onclick = () => ntToggleForm();
 document.getElementById('ackClose').onclick = hideAck;
 document.getElementById('ackModal').addEventListener('click', ev => { if (ev.target.id === 'ackModal') hideAck(); });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape') hideAck(); });
