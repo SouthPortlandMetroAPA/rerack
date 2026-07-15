@@ -281,7 +281,7 @@
 'use strict';
 /* ── Config ──────────────────────────────────────────────────────── */
 const SB_URL  = 'https://dqzbekoaysgaiqljueac.supabase.co';
-const SB_ANON = '__ANON_KEY__';   /* public anon key — injected by rerack-build.mjs */
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxemJla29heXNnYWlxbGp1ZWFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNzA5NzgsImV4cCI6MjA5MDc0Njk3OH0.cCdGxZ4zEFzU_r6lWSDeoNWG67Q4MSYCAtpds035dfU';   /* public anon key — injected by rerack-build.mjs */
 const IS_PREPROD = /\/preprod\//.test(location.pathname);
 const APP_ROW = IS_PREPROD ? 'ReRack-preprod' : 'ReRack';
 document.getElementById('verSpan').textContent = 'v' + (window.APP_VERSION || '?') + (IS_PREPROD ? ' (preprod)' : '');
