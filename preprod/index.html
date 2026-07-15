@@ -177,6 +177,11 @@
   .ack-msg { font-size: 1rem; line-height: 1.55; color: #3a3a3a; margin-bottom: 22px; }
   .ack-msg b { color: var(--ack-color); font-weight: 800; }
   .ack-box .btn-primary { margin-top: 0; }
+  .confirm-btns { display: flex; gap: 10px; }
+  .confirm-btns .btn-primary { flex: 1; margin-top: 0; }
+  .btn-cancel { flex: 1; border: 1.5px solid var(--border); border-radius: 999px; background: #fff;
+    color: var(--muted); font-weight: 800; font-size: 1rem; padding: 12px 14px; cursor: pointer; }
+  .btn-cancel:hover { border-color: var(--muted); color: var(--text); }
   @media (prefers-reduced-motion: reduce) { .ack-box, .ack-overlay { animation: none; } }
 
   /* ── CANONICAL "Updating…" overlay (per MEMORY.md consistency rule).
@@ -312,6 +317,18 @@
   </div>
 </div>
 
+<div class="ack-overlay" id="confirmModal">
+  <div class="ack-box" id="confirmBox">
+    <div class="ack-badge" id="confirmBadge">🤔</div>
+    <div class="ack-title" id="confirmTitle"></div>
+    <div class="ack-msg" id="confirmMsg"></div>
+    <div class="confirm-btns">
+      <button class="btn-cancel" id="confirmCancel">Keep it</button>
+      <button class="btn-primary" id="confirmYes">Yes, change it</button>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 /* ── Config ──────────────────────────────────────────────────────── */
@@ -341,6 +358,35 @@ function showAck(tone, emoji, title, body) {
   document.getElementById('ackModal').classList.add('shown');
 }
 function hideAck() { document.getElementById('ackModal').classList.remove('shown'); }
+
+/* Custom confirm dialog (replaces the native browser prompt) — styled box,
+   two buttons. Returns a Promise<boolean>: Yes → true, Cancel/Esc → false. */
+function customConfirm(tone, emoji, title, body) {
+  return new Promise(resolve => {
+    const t = ACK_TONES[tone] || ACK_TONES.playing;
+    const box = document.getElementById('confirmBox');
+    box.style.setProperty('--ack-color', t.color);
+    box.style.setProperty('--ack-tint', t.tint);
+    document.getElementById('confirmBadge').textContent = emoji;
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMsg').innerHTML = body;
+    const modal = document.getElementById('confirmModal');
+    const yes = document.getElementById('confirmYes');
+    const cancel = document.getElementById('confirmCancel');
+    modal.classList.add('shown');
+    const done = val => {
+      modal.classList.remove('shown');
+      yes.onclick = cancel.onclick = modal.onclick = null;
+      document.removeEventListener('keydown', onKey);
+      resolve(val);
+    };
+    const onKey = ev => { if (ev.key === 'Escape') done(false); else if (ev.key === 'Enter') done(true); };
+    yes.onclick = () => done(true);
+    cancel.onclick = () => done(false);
+    modal.onclick = ev => { if (ev.target.id === 'confirmModal') done(false); };
+    document.addEventListener('keydown', onKey);
+  });
+}
 
 /* ── Supabase helpers (anon; RPCs are the only write path) ───────── */
 async function rpc(fn, args) {
@@ -629,8 +675,14 @@ async function answer(gi, next) {
     stat0.textContent = '✓ Already recorded — you\'re all set.'; stat0.className = 'status ok';
     return;
   }
-  if (cur !== 'unanswered' && cur !== next
-      && !confirm('Change the answer to "' + word + '"? The change is recorded with your name.')) return;
+  if (cur !== 'unanswered' && cur !== next) {
+    const tone = next === 'playing' ? 'playing' : next === 'not_playing' ? 'not' : 'deciding';
+    const emoji = next === 'playing' ? '🎉' : next === 'not_playing' ? '👋' : '🤔';
+    const okToChange = await customConfirm(tone, emoji, 'Change your answer?',
+      'Change <b>' + esc(g[0].team_name || ('Team ' + g[0].team_number)) + '</b> to <b>' + word + '</b>? '
+      + 'The change is recorded with your name.');
+    if (!okToChange) return;
+  }
   const stat = document.querySelector('[data-gstat="' + gi + '"]');
   stat.textContent = 'Saving…'; stat.className = 'status';
   try {
