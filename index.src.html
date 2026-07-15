@@ -153,6 +153,19 @@
 
   .footer-note { text-align: center; color: var(--muted); font-size: 0.75rem; padding: 14px 0 30px; }
 
+  /* ── Conversational confirmation pop (v0.13) ── */
+  .ack-overlay { position: fixed; inset: 0; background: rgba(10, 20, 40, 0.55);
+    display: none; align-items: center; justify-content: center; z-index: 9998; padding: 24px; }
+  .ack-overlay.shown { display: flex; }
+  .ack-box { background: #fff; border-radius: 16px; padding: 28px 24px 22px; max-width: 380px;
+    width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    animation: ack-pop 0.18s ease-out; }
+  @keyframes ack-pop { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .ack-emoji { font-size: 2.6rem; line-height: 1; margin-bottom: 10px; }
+  .ack-msg { font-size: 1.05rem; line-height: 1.5; color: var(--text); margin-bottom: 18px; }
+  .ack-msg b { color: var(--spm-accent); }
+  @media (prefers-reduced-motion: reduce) { .ack-box { animation: none; } }
+
   /* ── CANONICAL "Updating…" overlay (per MEMORY.md consistency rule).
         Identical to PatchCheck / Slate admin. Do not customize. ── */
   .update-overlay { position: fixed; inset: 0; background: rgba(10, 20, 40, 0.72);
@@ -277,6 +290,14 @@
   </div>
 </div>
 
+<div class="ack-overlay" id="ackModal">
+  <div class="ack-box">
+    <div class="ack-emoji" id="ackEmoji">🎱</div>
+    <div class="ack-msg" id="ackMsg"></div>
+    <button class="btn-primary" id="ackClose">Got it</button>
+  </div>
+</div>
+
 <script>
 'use strict';
 /* ── Config ──────────────────────────────────────────────────────── */
@@ -288,6 +309,14 @@ document.getElementById('verSpan').textContent = 'v' + (window.APP_VERSION || '?
 if (IS_PREPROD) document.getElementById('envPill').style.display = '';
 
 const esc = s => { const d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; };
+
+/* Conversational confirmation pop — shown after an answer is recorded. */
+function showAck(emoji, html) {
+  document.getElementById('ackEmoji').textContent = emoji;
+  document.getElementById('ackMsg').innerHTML = html;
+  document.getElementById('ackModal').classList.add('shown');
+}
+function hideAck() { document.getElementById('ackModal').classList.remove('shown'); }
 
 /* ── Supabase helpers (anon; RPCs are the only write path) ───────── */
 async function rpc(fn, args) {
@@ -586,7 +615,23 @@ async function answer(gi, next) {
     }
     /* one email per card even for 8+9 pairs — same name, same roster */
     gasNotify({ action: 'rerack_answer_notify', team_id: g[0].team_id });
-    stat.textContent = '✓ Saved — thanks! Your team gets an email copy.'; stat.className = 'status ok';
+    const tname = esc(g[0].team_name || ('Team ' + g[0].team_number));
+    let emoji, msg;
+    if (next === 'playing') {
+      emoji = '🎉';
+      msg = "You're in! We've got <b>" + tname + "</b> down as <b>playing</b> next session. "
+          + "Your whole team just got an email, so everyone's on the same page.";
+    } else if (next === 'not_playing') {
+      emoji = '👋';
+      msg = "Got it — <b>" + tname + "</b> is marked as <b>not playing</b> next session. "
+          + "We've let your team know by email. Change your mind? Just pop back and update it.";
+    } else {
+      emoji = '🤔';
+      msg = "No rush! We've noted <b>" + tname + "</b> as <b>still deciding</b>. "
+          + "Your team got an email about it — swing back and give us the word whenever you're ready.";
+    }
+    showAck(emoji, msg);
+    stat.textContent = '✓ Recorded'; stat.className = 'status ok';
     await loadTeams();
   } catch (e) {
     stat.textContent = e.message; stat.className = 'status err';
@@ -752,6 +797,9 @@ document.getElementById('identBtn').onclick = lookup;
 document.getElementById('identInput').addEventListener('keydown', ev => { if (ev.key === 'Enter') lookup(); });
 document.getElementById('ntBtn').onclick = newTeam;
 document.getElementById('ntFormat').addEventListener('change', ntToggleRoster);
+document.getElementById('ackClose').onclick = hideAck;
+document.getElementById('ackModal').addEventListener('click', ev => { if (ev.target.id === 'ackModal') hideAck(); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') hideAck(); });
 renderWho();
 if (me) { loadTeams(); loadMyIntents(); }
 </script>
