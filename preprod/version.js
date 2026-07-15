@@ -1,8 +1,6 @@
 /* ════════════════════════════════════════════════════════════════════════
-   ReRack — PROD version constant (the promoted copy). Do NOT hand-edit this
-   for a preprod ship — edit preprod/version.js instead. rerack-build.mjs
-   --promote copies preprod/version.js over this file AFTER sign-off, then you
-   sync the 'ReRack' apa_core row. (Header corrected 2026-07-15: it previously
-   mislabeled this as the preprod file, which caused a wrong-file version bump.)
+   ReRack — PREPROD version constant. Edit THIS file for every preprod ship;
+   rerack-build.mjs --promote copies it over the root (prod) version.js after
+   sign-off, then you sync the 'ReRack' apa_core row.
    ════════════════════════════════════════════════════════════════════════ */
-window.APP_VERSION = '0.11';
+window.APP_VERSION = '0.12';
