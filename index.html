@@ -89,6 +89,29 @@
     line-height: 1.45; background: #e8f0fe; border: 1px solid #afc6f0; color: #1a3b6b; }
   .join-line a { color: var(--spm-accent); font-weight: 700; }
 
+  /* ── Team-first banner + scorekeeper note (v0.12) ── */
+  .team-banner { background: #fff4f5; border: 1.5px solid var(--spm-primary);
+    border-left: 6px solid var(--spm-primary); border-radius: 12px; padding: 14px 16px;
+    margin-bottom: 14px; font-size: 0.95rem; line-height: 1.5; color: #7a1020; }
+  .team-banner .bhead { display: block; font-weight: 900; font-size: 1.02rem; margin-bottom: 4px;
+    color: var(--spm-primary); }
+  .team-banner b { color: var(--spm-primary); }
+  .scorekeeper-note { background: #eef4ff; border: 1px solid #afc6f0; border-radius: 10px;
+    padding: 10px 12px; margin-top: 10px; font-size: 0.82rem; line-height: 1.5; color: #1a3b6b; }
+  .scorekeeper-note b { color: var(--spm-accent); }
+
+  /* ── New-team form collapsed behind an optional toggle (v0.16) ── */
+  .nt-card { background: #fafbfc; }
+  .nt-toggle { width: 100%; background: none; border: none; padding: 0; cursor: pointer;
+    text-align: left; display: flex; flex-direction: column; gap: 3px; }
+  .nt-toggle-title { font-size: 1.05rem; font-weight: 800; color: var(--spm-accent); }
+  .nt-toggle-sub { font-size: 0.82rem; color: var(--muted); font-weight: 400; line-height: 1.45; }
+  .nt-chev { display: inline-block; transition: transform 0.15s; font-size: 0.8rem; }
+  .nt-chev.open { transform: rotate(90deg); }
+  .done-note { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: #e4f1e9;
+    border: 1px solid #b7e0c6; color: #1f6b3f; font-size: 0.88rem; line-height: 1.5; }
+  .done-note b { color: #155c33; }
+
   /* ── Inputs / buttons (house pills) ── */
   input, select, textarea { width: 100%; padding: 11px 14px; border: 1px solid var(--border);
     border-radius: 999px; font: inherit; margin-top: 8px; background: var(--bg);
@@ -142,6 +165,37 @@
 
   .footer-note { text-align: center; color: var(--muted); font-size: 0.75rem; padding: 14px 0 30px; }
 
+  /* ── Custom confirmation pop (v0.14) — tone-tinted badge + title ── */
+  .ack-overlay { position: fixed; inset: 0; background: rgba(10, 20, 40, 0.5);
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center; z-index: 9998; padding: 24px;
+    animation: ack-fade 0.2s ease-out; }
+  .ack-overlay.shown { display: flex; }
+  @keyframes ack-fade { from { opacity: 0; } to { opacity: 1; } }
+  .ack-box { --ack-color: var(--spm-accent); --ack-tint: #e8f0fe;
+    position: relative; background: #fff; border-radius: 22px; padding: 32px 26px 24px;
+    max-width: 400px; width: 100%; text-align: center; overflow: hidden;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+    animation: ack-pop 0.24s cubic-bezier(0.18, 0.9, 0.3, 1.25); }
+  .ack-box::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px;
+    background: var(--ack-color); }
+  @keyframes ack-pop { from { transform: scale(0.9) translateY(10px); opacity: 0; }
+    to { transform: scale(1) translateY(0); opacity: 1; } }
+  .ack-badge { width: 78px; height: 78px; border-radius: 50%; margin: 4px auto 16px;
+    display: grid; place-items: center; font-size: 2.4rem; line-height: 1;
+    background: var(--ack-tint); box-shadow: 0 0 0 4px #fff, 0 0 0 6px var(--ack-color); }
+  .ack-title { font-size: 1.42rem; font-weight: 900; color: var(--ack-color);
+    letter-spacing: -0.01em; margin-bottom: 7px; }
+  .ack-msg { font-size: 1rem; line-height: 1.55; color: #3a3a3a; margin-bottom: 22px; }
+  .ack-msg b { color: var(--ack-color); font-weight: 800; }
+  .ack-box .btn-primary { margin-top: 0; }
+  .confirm-btns { display: flex; gap: 10px; }
+  .confirm-btns .btn-primary { flex: 1; margin-top: 0; }
+  .btn-cancel { flex: 1; border: 1.5px solid var(--border); border-radius: 999px; background: #fff;
+    color: var(--muted); font-weight: 800; font-size: 1rem; padding: 12px 14px; cursor: pointer; }
+  .btn-cancel:hover { border-color: var(--muted); color: var(--text); }
+  @media (prefers-reduced-motion: reduce) { .ack-box, .ack-overlay { animation: none; } }
+
   /* ── CANONICAL "Updating…" overlay (per MEMORY.md consistency rule).
         Identical to PatchCheck / Slate admin. Do not customize. ── */
   .update-overlay { position: fixed; inset: 0; background: rgba(10, 20, 40, 0.72);
@@ -162,10 +216,17 @@
 <div class="page">
   <header>
     <div class="title">ReRack</div>
-    <div class="subtitle">Rack up for <span id="targetName">the next session</span></div>
+    <div class="subtitle">Is your <b>team</b> coming back for <span id="targetName">next session</span>?</div>
     <div class="env-pill" id="envPill" style="display:none">Preprod</div>
     <div class="header-status" id="whoLine" style="display:none"></div>
   </header>
+
+  <div class="team-banner">
+    <span class="bhead">This is about your team — not just you.</span>
+    We only need to know one thing: is <b>the team itself</b> coming back next session? Any one player
+    can answer for the whole team, and it's fine no matter who's on the roster. Heads up —
+    <b>whatever you answer here is emailed to everyone on your team.</b>
+  </div>
 
   <div class="card" id="whoForCard">
     <div class="join-line" style="margin:0 0 12px">
@@ -174,13 +235,11 @@
       <a href="https://join.poolplayers.com" target="_blank" rel="noopener">join.poolplayers.com</a>
       — new players sign up there too.
     </div>
-    <h2>Is this you?</h2>
-    <div class="who-row"><b>Playing now — DJ or Ladies?</b>
-      <span>Answer here, or in your scorekeeper app. Either works.</span></div>
-    <div class="who-row"><b>Playing now — Masters or Doubles?</b>
-      <span>Answer here — this is the place.</span></div>
-    <div class="who-row"><b>Sat this session out?</b>
-      <span>Tell us if your team is back for <span class="targetNameInline">next session</span>.</span></div>
+    <h2>Which team are you answering for?</h2>
+    <div class="who-row"><b>On a team this session?</b>
+      <span>Say whether <b>the team</b> is coming back for <span class="targetNameInline">next session</span>. One answer covers the whole team.</span></div>
+    <div class="who-row"><b>Your team sat this session out?</b>
+      <span>Tell us if it's back for <span class="targetNameInline">next session</span>.</span></div>
     <div class="who-row new-row"><b>Starting a NEW team?</b>
       <span>Enter your APA number below first — the short form appears after. APA membership required.</span></div>
   </div>
@@ -196,9 +255,13 @@
 
   <div class="card" id="teamsCard" style="display:none">
     <h2>Your teams</h2>
-    <p class="hint">Tell us for each team: playing <span class="targetNameInline">next session</span>, or not.
-       You can change an answer any time — every change is recorded and your team gets an email copy.
-       Anything else changing — captain, host location, night of play? Add it under the team.</p>
+    <p class="hint">For each team, just one thing: is <b>the team</b> coming back
+       <span class="targetNameInline">next session</span>, or not? Any player can answer, you can change it
+       any time, and every answer is <b>emailed to the whole team</b>. Something changing — captain, host
+       location, night of play? Add it under the team.</p>
+    <div class="scorekeeper-note">🎱 <b>You don't do your roster here.</b> Roster changes are made in your
+       scorekeeper app once the new session opens (before it starts) — that's where <b>DJ &amp; Ladies</b>
+       teams add or drop players. <b>Doubles &amp; Masters</b> rosters carry over as they are.</div>
     <div id="teamsList"></div>
   </div>
 
@@ -209,8 +272,12 @@
     <div id="myIntentsList"></div>
   </div>
 
-  <div class="card" id="newTeamCard" style="display:none">
-    <h2>Starting a NEW team?</h2>
+  <div class="card nt-card" id="newTeamCard" style="display:none">
+    <button class="nt-toggle" id="ntToggle" type="button">
+      <span class="nt-toggle-title">Starting a <b>brand-new</b> team? <span class="nt-chev" id="ntChev">&#9656;</span></span>
+      <span class="nt-toggle-sub">Only tap this if your team <b>isn't listed above.</b> If it is, you're already done — there's no form to fill out here.</span>
+    </button>
+    <div id="ntForm" style="display:none">
     <p class="hint">The basics only — no roster needed yet. We prefilled your contact info from
        your APA record; fix anything that's off.</p>
     <!-- autocomplete=off: Chrome's saved-address autofill was injecting a
@@ -244,6 +311,7 @@
     <textarea id="ntNote" placeholder="Anything else? (who's in, questions, special requests)"></textarea>
     <button class="btn-primary" id="ntBtn">Count us in</button>
     <div class="status" id="ntStatus"></div>
+    </div>
   </div>
 
   <div class="footer-note">ReRack <span id="verSpan"></span> · South Portland Metro APA</div>
@@ -254,6 +322,27 @@
     <div class="update-spinner"></div>
     <div class="update-title">Updating&hellip;</div>
     <div class="update-sub">A new version is being deployed. This tab will reload automatically&hellip;</div>
+  </div>
+</div>
+
+<div class="ack-overlay" id="ackModal">
+  <div class="ack-box" id="ackBox">
+    <div class="ack-badge" id="ackBadge">🎱</div>
+    <div class="ack-title" id="ackTitle"></div>
+    <div class="ack-msg" id="ackMsg"></div>
+    <button class="btn-primary" id="ackClose">Got it</button>
+  </div>
+</div>
+
+<div class="ack-overlay" id="confirmModal">
+  <div class="ack-box" id="confirmBox">
+    <div class="ack-badge" id="confirmBadge">🤔</div>
+    <div class="ack-title" id="confirmTitle"></div>
+    <div class="ack-msg" id="confirmMsg"></div>
+    <div class="confirm-btns">
+      <button class="btn-cancel" id="confirmCancel">Keep it</button>
+      <button class="btn-primary" id="confirmYes">Yes, change it</button>
+    </div>
   </div>
 </div>
 
@@ -268,6 +357,53 @@ document.getElementById('verSpan').textContent = 'v' + (window.APP_VERSION || '?
 if (IS_PREPROD) document.getElementById('envPill').style.display = '';
 
 const esc = s => { const d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; };
+
+/* Custom confirmation pop — tone-tinted badge + title, per answer. */
+const ACK_TONES = {
+  playing:  { color: '#0031a1', tint: '#e8f0fe' },
+  not:      { color: '#a02030', tint: '#fce8ea' },
+  deciding: { color: '#6d28d9', tint: '#ede9fe' }
+};
+function showAck(tone, emoji, title, body) {
+  const t = ACK_TONES[tone] || ACK_TONES.playing;
+  const box = document.getElementById('ackBox');
+  box.style.setProperty('--ack-color', t.color);
+  box.style.setProperty('--ack-tint', t.tint);
+  document.getElementById('ackBadge').textContent = emoji;
+  document.getElementById('ackTitle').textContent = title;
+  document.getElementById('ackMsg').innerHTML = body;
+  document.getElementById('ackModal').classList.add('shown');
+}
+function hideAck() { document.getElementById('ackModal').classList.remove('shown'); }
+
+/* Custom confirm dialog (replaces the native browser prompt) — styled box,
+   two buttons. Returns a Promise<boolean>: Yes → true, Cancel/Esc → false. */
+function customConfirm(tone, emoji, title, body) {
+  return new Promise(resolve => {
+    const t = ACK_TONES[tone] || ACK_TONES.playing;
+    const box = document.getElementById('confirmBox');
+    box.style.setProperty('--ack-color', t.color);
+    box.style.setProperty('--ack-tint', t.tint);
+    document.getElementById('confirmBadge').textContent = emoji;
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMsg').innerHTML = body;
+    const modal = document.getElementById('confirmModal');
+    const yes = document.getElementById('confirmYes');
+    const cancel = document.getElementById('confirmCancel');
+    modal.classList.add('shown');
+    const done = val => {
+      modal.classList.remove('shown');
+      yes.onclick = cancel.onclick = modal.onclick = null;
+      document.removeEventListener('keydown', onKey);
+      resolve(val);
+    };
+    const onKey = ev => { if (ev.key === 'Escape') done(false); else if (ev.key === 'Enter') done(true); };
+    yes.onclick = () => done(true);
+    cancel.onclick = () => done(false);
+    modal.onclick = ev => { if (ev.target.id === 'confirmModal') done(false); };
+    document.addEventListener('keydown', onKey);
+  });
+}
 
 /* ── Supabase helpers (anon; RPCs are the only write path) ───────── */
 async function rpc(fn, args) {
@@ -342,7 +478,7 @@ function renderWho() {
          person on this device */
       _prefilledFor = null;
       ['ntName', 'ntPhone', 'ntEmail'].forEach(id => { document.getElementById(id).value = ''; });
-      _gRoster = {}; _intentRosters = {};
+      _intentRosters = {};
       _ntRoster = [{ apa: '', name: '' }, { apa: '', name: '' }];
       document.getElementById('teamsCard').style.display = 'none';
       document.getElementById('myIntentsCard').style.display = 'none';
@@ -453,11 +589,11 @@ function groupLabel(g) {
   return pairKind(g[0]) === 'dbl' ? '8-Ball + 9-Ball Doubles' : '8-Ball + 9-Ball';
 }
 
-/* ── Roster capture (scope #11) — Masters + Doubles register with the
-      full roster; names required, APA numbers optional (blank = "sign
-      up at join.poolplayers.com, update here when you have it") ──── */
+/* ── Roster capture — NEW Masters/Doubles teams register the full roster
+      here (names required, APA numbers optional). RETURNING teams do NOT do
+      roster in ReRack (v0.12): DJ & Ladies change rosters in the scorekeeper
+      app once the session opens; Doubles & Masters rosters are fixed. ──── */
 const ROSTER_FORMATS = ['Masters', '8-Ball Doubles', '9-Ball Doubles'];
-function groupNeedsRoster(g) { return g.some(t => ROSTER_FORMATS.indexOf(t.format) >= 0); }
 const ROSTER_HINT = '<div class="hint" style="margin-top:6px">No APA number yet? Have them sign up at '
   + '<a href="https://join.poolplayers.com" target="_blank" rel="noopener">join.poolplayers.com</a>'
   + ' — leave it blank for now and come back to add it.</div>';
@@ -491,36 +627,6 @@ function wireRosterEditor(box, rows, onSave) {
 function rosterPayload(rows) {
   return rows.filter(r => (r.name || '').trim())
     .map(r => ({ apa: (r.apa || '').trim(), name: r.name.trim() }));
-}
-
-let _gRoster = {};   /* team-card editor state per group index */
-async function loadGroupRoster(gi) {
-  const box = document.querySelector('[data-rosterbox="' + gi + '"]');
-  if (!box || box.dataset.wired) return;
-  box.dataset.wired = '1';
-  const g = groupTeams(_teams)[gi];
-  if (!_gRoster[gi]) {
-    try {
-      const rows = await rpc('rerack_get_roster', { p_apa: me.apa, p_team_id: g[0].team_id });
-      _gRoster[gi] = (rows || []).map(r => ({ apa: r.apa || '', name: r.full_name || '' }));
-    } catch (e) { _gRoster[gi] = []; }
-    if (!_gRoster[gi].length) _gRoster[gi] = [{ apa: '', name: '' }, { apa: '', name: '' }];
-  }
-  wireRosterEditor(box, _gRoster[gi], () => saveGroupRoster(gi));
-}
-async function saveGroupRoster(gi) {
-  const g = groupTeams(_teams)[gi];
-  const stat = document.querySelector('[data-gstat="' + gi + '"]');
-  const payload = rosterPayload(_gRoster[gi]);
-  if (!payload.length) { stat.textContent = 'List at least one player by name.'; stat.className = 'status err'; return; }
-  stat.textContent = 'Saving roster…'; stat.className = 'status';
-  try {
-    for (const t of g) {
-      await rpc('rerack_set_roster', { p_apa: me.apa, p_team_id: t.team_id, p_intent_id: null, p_roster: payload });
-    }
-    gasNotify({ action: 'rerack_answer_notify', team_id: g[0].team_id });
-    stat.textContent = '✓ Roster saved — your team gets an email copy.'; stat.className = 'status ok';
-  } catch (e) { stat.textContent = e.message; stat.className = 'status err'; }
 }
 
 function renderTeams() {
@@ -561,23 +667,17 @@ function renderTeams() {
       + '<input data-gplayers="' + gi + '" placeholder="Need players? e.g. 2 players — an SL3 and an SL5" value="' + esc(playersRow ? playersRow.players_needed : '') + '">'
       + '<button class="btn-quiet" data-gnotesave="' + gi + '">Save</button>'
       + '</details>'
-      + (groupNeedsRoster(g)
-          ? '<details class="note-details" data-rosterdet="' + gi + '">'
-            + '<summary>Fall roster — who\'s playing?</summary>'
-            + '<div data-rosterbox="' + gi + '"><p class="hint">Loading…</p></div>'
-            + '</details>'
-          : '')
       + '<div class="status" data-gstat="' + gi + '"></div>'
       + '</div>';
-  }).join('');
+  }).join('')
+    + '<div class="done-note">👆 That\'s all we need — just tap an answer for each team above. '
+    + '<b>There\'s no form to fill out.</b> The "new team" box below is only for starting a '
+    + 'brand-new team that isn\'t in the league yet.</div>';
   list.querySelectorAll('.answer-row button, .answer-undecided').forEach(btn => {
     btn.onclick = () => answer(Number(btn.dataset.g), btn.dataset.ans);
   });
   list.querySelectorAll('button[data-gnotesave]').forEach(btn => {
     btn.onclick = () => saveNote(Number(btn.dataset.gnotesave));
-  });
-  list.querySelectorAll('details[data-rosterdet]').forEach(d => {
-    d.addEventListener('toggle', () => { if (d.open) loadGroupRoster(Number(d.dataset.rosterdet)); });
   });
 }
 
@@ -595,8 +695,14 @@ async function answer(gi, next) {
     stat0.textContent = '✓ Already recorded — you\'re all set.'; stat0.className = 'status ok';
     return;
   }
-  if (cur !== 'unanswered' && cur !== next
-      && !confirm('Change the answer to "' + word + '"? The change is recorded with your name.')) return;
+  if (cur !== 'unanswered' && cur !== next) {
+    const tone = next === 'playing' ? 'playing' : next === 'not_playing' ? 'not' : 'deciding';
+    const emoji = next === 'playing' ? '🎉' : next === 'not_playing' ? '👋' : '🤔';
+    const okToChange = await customConfirm(tone, emoji, 'Change your answer?',
+      'Change <b>' + esc(g[0].team_name || ('Team ' + g[0].team_number)) + '</b> to <b>' + word + '</b>? '
+      + 'The change is recorded with your name.');
+    if (!okToChange) return;
+  }
   const stat = document.querySelector('[data-gstat="' + gi + '"]');
   stat.textContent = 'Saving…'; stat.className = 'status';
   try {
@@ -605,7 +711,21 @@ async function answer(gi, next) {
     }
     /* one email per card even for 8+9 pairs — same name, same roster */
     gasNotify({ action: 'rerack_answer_notify', team_id: g[0].team_id });
-    stat.textContent = '✓ Saved — thanks! Your team gets an email copy.'; stat.className = 'status ok';
+    const tname = esc(g[0].team_name || ('Team ' + g[0].team_number));
+    if (next === 'playing') {
+      showAck('playing', '🎉', "You're in!",
+        "We've got <b>" + tname + "</b> down as playing next session. Your whole team just got an "
+        + "email, so everyone's on the same page.");
+    } else if (next === 'not_playing') {
+      showAck('not', '👋', "All set",
+        "<b>" + tname + "</b> is marked as not playing next session, and we've let your team know by "
+        + "email. Changed your mind? Just pop back and update it.");
+    } else {
+      showAck('deciding', '🤔', "No rush!",
+        "We've noted <b>" + tname + "</b> as still deciding, and your team got an email about it. "
+        + "Swing back and give us the word whenever you're ready.");
+    }
+    stat.textContent = '✓ Recorded'; stat.className = 'status ok';
     await loadTeams();
   } catch (e) {
     stat.textContent = e.message; stat.className = 'status err';
@@ -640,7 +760,19 @@ async function loadTeams() {
     _teams = await rpc('rerack_my_teams', { p_apa: me.apa }) || [];
   } catch (e) { _teams = []; }
   renderTeams();
+  syncNewTeamVisibility();
 }
+
+/* New-team form is collapsed behind a clearly-optional toggle so returning
+   players (who just answer above) aren't lured into filling a reg form.
+   Auto-opens ONLY when the player has NO teams (likely here to start one). */
+function ntToggleForm(open) {
+  const f = document.getElementById('ntForm');
+  const show = open === undefined ? f.style.display === 'none' : open;
+  f.style.display = show ? '' : 'none';
+  document.getElementById('ntChev').classList.toggle('open', show);
+}
+function syncNewTeamVisibility() { ntToggleForm(_teams.length === 0); }
 
 /* ── Your new-team requests — visible once identified; lets the
       organizer update the roster later (the "add the APA number when
@@ -771,6 +903,10 @@ document.getElementById('identBtn').onclick = lookup;
 document.getElementById('identInput').addEventListener('keydown', ev => { if (ev.key === 'Enter') lookup(); });
 document.getElementById('ntBtn').onclick = newTeam;
 document.getElementById('ntFormat').addEventListener('change', ntToggleRoster);
+document.getElementById('ntToggle').onclick = () => ntToggleForm();
+document.getElementById('ackClose').onclick = hideAck;
+document.getElementById('ackModal').addEventListener('click', ev => { if (ev.target.id === 'ackModal') hideAck(); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') hideAck(); });
 renderWho();
 if (me) { loadTeams(); loadMyIntents(); }
 </script>
