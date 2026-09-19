@@ -920,6 +920,7 @@ async function spmSsoIdentity() {
     if (!b.signedIn) { if (b.error) { const s = document.getElementById('identStatus'); s.textContent = b.error; s.className = 'status'; } return false; }
     const w = await spmAuth.whoami(b.token);
     if (!(w && w.ok && w.me)) return false;
+    w.me.token = b.token;
     return w.me;
   } catch (e) { return false; }
 }
@@ -937,7 +938,8 @@ function spmWireSignIn() {
 spmAuth.onChange(function () { location.reload(); });   /* SSO: signed in/out from another app */
 
 (async () => {
-  if (!me || !me.sso) { const w = await spmSsoIdentity(); if (w) { me = { apa: w.member_number, name: w.name, sso: true }; localStorage.setItem('rerack.identity', JSON.stringify(me)); } }
+  if (me && me.sso && me.sso !== spmAuth.get()) { me = null; localStorage.removeItem('rerack.identity'); }   /* SSO identity is only as alive as the shared token */
+  if (!me) { const w = await spmSsoIdentity(); if (w) { me = { apa: w.member_number, name: w.name, sso: w.token }; localStorage.setItem('rerack.identity', JSON.stringify(me)); } }
   spmWireSignIn();
   renderWho();
   if (me) { loadTeams(); loadMyIntents(); }
