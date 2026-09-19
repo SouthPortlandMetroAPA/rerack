@@ -40,6 +40,7 @@
      the SRC, not the output.
      ════════════════════════════════════════════════════════════════════ -->
 <script src="version.js"></script>
+<script src="https://southportlandmetroapa.github.io/shared/spm-auth.js"></script>
 <style>
   :root {
     --spm-primary: #ea002a;
@@ -253,6 +254,7 @@
     <input id="identInput" placeholder="APA # or email" autocomplete="off" inputmode="email">
     <button class="btn-primary" id="identBtn">Get started</button>
     <div class="status" id="identStatus"></div>
+    <p class="hint" style="margin-top:8px;font-size:.9rem">Or <a href="#" id="spmSignIn">sign in once</a> and every South Portland Metro app will know you.</p>
   </div>
 
   <div class="card" id="teamsCard" style="display:none">
@@ -474,6 +476,7 @@ function renderWho() {
     ntCard.style.display = '';           /* revealed only once identified */
     document.getElementById('switchLink').onclick = (ev) => {
       ev.preventDefault();
+      if (me && me.sso) spmAuth.logout();   /* an SSO identity signs out everywhere */
       me = null;
       localStorage.removeItem('rerack.identity');
       /* the old identity's contact details must not linger for the next
@@ -505,8 +508,8 @@ let _prefilledFor = null;
 async function prefillContact() {
   if (!me || _prefilledFor === me.apa) return;
   try {
-    const rows = await rpc('rerack_my_contact', { p_apa: me.apa });
-    const c = (rows && rows[0]) || {};
+    if (!me.sso) { _prefilledFor = me.apa; return; }   /* contact prefill only for a SIGNED-IN member (own record); typed identities fill by hand */
+    const w = await spmAuth.whoami(); const c = (w && w.ok && w.me) ? { name: w.me.name, phone: w.me.phone, email: w.me.email } : {};
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
     set('ntName', c.name || me.name);
     set('ntPhone', c.phone);
@@ -909,8 +912,36 @@ document.getElementById('ntToggle').onclick = () => ntToggleForm();
 document.getElementById('ackClose').onclick = hideAck;
 document.getElementById('ackModal').addEventListener('click', ev => { if (ev.target.id === 'ackModal') hideAck(); });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape') hideAck(); });
-renderWho();
-if (me) { loadTeams(); loadMyIntents(); }
+
+/* ── Shared sign-in (spm-auth.js): a session from ANY SPM app identifies you here; the link below mints one for this app ── */
+async function spmSsoIdentity() {
+  try {
+    const b = await spmAuth.boot({ app: 'rerack' });
+    if (!b.signedIn) { if (b.error) { const s = document.getElementById('identStatus'); s.textContent = b.error; s.className = 'status'; } return false; }
+    const w = await spmAuth.whoami(b.token);
+    if (!(w && w.ok && w.me)) return false;
+    return w.me;
+  } catch (e) { return false; }
+}
+function spmWireSignIn() {
+  const a = document.getElementById('spmSignIn'); if (!a) return;
+  a.onclick = async (ev) => {
+    ev.preventDefault();
+    const v = (document.getElementById('identInput').value || '').trim();
+    if (!v) { { const s = document.getElementById('identStatus'); s.textContent = 'Enter your APA # or email first, then tap Sign in once.'; s.className = 'status'; } return; }
+    { const s = document.getElementById('identStatus'); s.textContent = 'Sending your sign-in link…'; s.className = 'status'; }
+    const r = await spmAuth.requestLink(v, 'rerack');
+    { const s = document.getElementById('identStatus'); s.textContent = r.ok ? 'Check your email — tap the link and every SPM app will know you.' : (r.error || 'Something went wrong.'); s.className = 'status'; }
+  };
+}
+spmAuth.onChange(function () { location.reload(); });   /* SSO: signed in/out from another app */
+
+(async () => {
+  if (!me || !me.sso) { const w = await spmSsoIdentity(); if (w) { me = { apa: w.member_number, name: w.name, sso: true }; localStorage.setItem('rerack.identity', JSON.stringify(me)); } }
+  spmWireSignIn();
+  renderWho();
+  if (me) { loadTeams(); loadMyIntents(); }
+})();
 </script>
 </body>
 </html>
